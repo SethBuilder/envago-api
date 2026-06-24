@@ -1,0 +1,31 @@
+# Dependencies installed on server by composer
+/vendor/
+
+# Local env files
+.env
+.env.prod
+.env.production
+.env.backup
+
+# Deploy artifacts
+deploy-*.zip
+build_deploy.py
+
+# Storage (created by postdeploy hook)
+/storage/logs/*
+/storage/framework/cache/*
+/storage/framework/sessions/*
+/storage/framework/views/*
+!/storage/framework/cache/.gitkeep
+!/storage/framework/sessions/.gitkeep
+!/storage/framework/views/.gitkeep
+
+# Bootstrap cache (generated on server)
+/bootstrap/cache/*.php
+!/bootstrap/cache/.gitkeep
+
+# Dev tools
+/.cursor/
+/.idea/
+/.vscode/
+node_modules/
