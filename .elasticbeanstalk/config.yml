@@ -1,0 +1,19 @@
+branch-defaults:
+  master:
+    environment: envago-api-production
+environment-defaults:
+  envago-api-production:
+    branch: null
+    repository: null
+global:
+  application_name: envago-api
+  default_ec2_keyname: null
+  default_platform: PHP 8.5 running on 64bit Amazon Linux 2023
+  default_region: sa-east-1
+  include_git_submodules: true
+  instance_profile: null
+  platform_name: null
+  platform_version: null
+  profile: null
+  sc: null
+  workspace_type: Application
