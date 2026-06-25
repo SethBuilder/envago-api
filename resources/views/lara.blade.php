@@ -253,7 +253,6 @@ async function sendMessage() {
         appendMsg('lara', data.reply);
     } catch (e) {
         removeTyping();
-        appendMsg('lara', 'Erro ao conectar. Tente novamente.');
     } finally {
         sendBtn.disabled = false;
         inputEl.focus();
