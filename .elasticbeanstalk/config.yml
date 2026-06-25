@@ -1,6 +1,7 @@
 branch-defaults:
   master:
     environment: envago-api-production
+    group_suffix: null
 environment-defaults:
   envago-api-production:
     branch: null
