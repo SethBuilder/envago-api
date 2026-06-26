@@ -116,16 +116,15 @@ class ActivityController extends Controller
             Schedule::insert($schedules);
         }
 
-        // Photos
+        // Photos — store path only; URL is resolved at runtime by Media::getUrlAttribute()
         if ($request->hasFile('photos')) {
             $disk  = config('filesystems.default') === 's3' ? 's3' : 'public';
             $order = 0;
             foreach ($request->file('photos') as $photo) {
                 $path = $photo->store('activities/' . $activity->id, ['disk' => $disk, 'visibility' => 'public']);
-                $url  = Storage::disk($disk)->url($path);
                 Media::create([
                     'activity_id' => $activity->id,
-                    'url'         => $url,
+                    'url'         => $path,
                     'type'        => $order === 0 ? 'cover' : 'gallery',
                     'order'       => $order++,
                 ]);
