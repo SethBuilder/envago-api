@@ -189,10 +189,6 @@
         Adicionar outra combinação de dias
       </button>
       <span class="f-error" id="err-groups"></span>
-      <div id="schedule-preview" class="preview-box" style="display:none;">
-        <svg width="16" height="16" fill="none" stroke="#16a34a" stroke-width="2" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
-        <span id="preview-text"></span>
-      </div>
     </div>
   </div>
 
@@ -319,28 +315,7 @@ function removeTime(id, ts) {
   updatePreview();
 }
 
-function updatePreview() {
-  const dayNames = ['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'];
-  let total = 0; const parts = [];
-  Object.keys(groups).forEach(id => {
-    const days  = [...groups[id].days].sort();
-    const times = [...document.querySelectorAll(`[name="groups[${id}][times][]"]`)].map(i => i.value).filter(Boolean);
-    if (!days.length || !times.length) return;
-    let count = 0;
-    const today = new Date(); today.setHours(0,0,0,0);
-    for (let d = 0; d < 60; d++) {
-      const dt = new Date(today); dt.setDate(dt.getDate()+d);
-      if (days.includes(dt.getDay())) count += times.length;
-    }
-    total += count;
-    parts.push(days.map(d => dayNames[d]).join(', ') + ' às ' + times.join(' e '));
-  });
-  const box = document.getElementById('schedule-preview');
-  if (!total) { box.style.display = 'none'; return; }
-  document.getElementById('preview-text').innerHTML =
-    `Serão criados <strong>${total} horários</strong> nos próximos 60 dias — ${parts.join(' · ')}.`;
-  box.style.display = 'flex';
-}
+function updatePreview() {}
 
 // ── Photos ───────────────────────────────────────────────────
 let selectedFiles = [];

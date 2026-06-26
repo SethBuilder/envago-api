@@ -57,11 +57,11 @@ class ActivityController extends Controller
             'groups.*.days.required'    => 'Selecione pelo menos um dia em cada grupo.',
             'groups.*.times.required'   => 'Adicione pelo menos um horário em cada grupo.',
             'groups.*.times.*.date_format' => 'Horário inválido.',
-            'photos.required'           => 'Adicione pelo menos uma foto.',
-            'photos.min'                => 'Adicione pelo menos uma foto.',
-            'photos.*.image'            => 'O arquivo deve ser uma imagem.',
-            'photos.*.mimes'            => 'Formatos aceitos: JPG, PNG, WebP.',
-            'photos.*.max'              => 'Cada foto pode ter no máximo 5 MB.',
+            'photos.required'           => 'Adicione pelo menos uma foto para continuar.',
+            'photos.min'                => 'Adicione pelo menos uma foto para continuar.',
+            'photos.*.image'            => 'Arquivo inválido. Use apenas fotos (JPG, PNG ou WebP).',
+            'photos.*.mimes'            => 'Arquivo inválido. Use apenas fotos (JPG, PNG ou WebP).',
+            'photos.*.max'              => 'Uma das fotos passou de 5 MB. Reduza o tamanho e tente novamente.',
         ]);
 
         $provider = auth()->user()->provider;
