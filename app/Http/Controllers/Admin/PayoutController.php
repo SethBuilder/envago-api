@@ -8,7 +8,6 @@ use App\Models\Payout;
 use App\Models\Schedule;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 
 class PayoutController extends Controller
@@ -62,7 +61,7 @@ class PayoutController extends Controller
         $amount   = round($bookings->sum('total_price') * 0.9, 2);
         $provider = $schedule->activity->provider;
 
-        try { DB::transaction(function () use ($request, $schedule, $bookings, $amount, $provider) {
+        DB::transaction(function () use ($request, $schedule, $bookings, $amount, $provider) {
             $disk = config('filesystems.default') === 's3' ? 's3' : 'local';
             $path = $request->file('confirmation')->store(
                 'payouts/confirmations',
@@ -81,10 +80,7 @@ class PayoutController extends Controller
             ]);
 
             Booking::whereIn('id', $bookings->pluck('id'))->update(['payout_id' => $payout->id]);
-        }); } catch (\Throwable $e) {
-            Log::error('Payout pay() failed: ' . $e->getMessage() . ' in ' . $e->getFile() . ':' . $e->getLine());
-            return back()->withErrors(['error' => 'Erro: ' . $e->getMessage()]);
-        }
+        });
 
         return back()->with('success', "Pagamento de R$ " . number_format($amount, 0, ',', '.') . " para {$provider->business_name} registrado.");
     }
