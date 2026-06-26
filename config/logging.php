@@ -1,5 +1,7 @@
 <?php
 
+use Aws\CloudWatchLogs\CloudWatchLogsClient;
+use Maxbanton\Cwh\Handler\CloudWatch;
 use Monolog\Handler\NullHandler;
 use Monolog\Handler\StreamHandler;
 use Monolog\Handler\SyslogUdpHandler;
@@ -116,6 +118,12 @@ return [
             'driver' => 'errorlog',
             'level' => env('LOG_LEVEL', 'debug'),
             'replace_placeholders' => true,
+        ],
+
+        'cloudwatch' => [
+            'driver' => 'custom',
+            'via'    => \App\Logging\CloudWatchLogger::class,
+            'level'  => env('LOG_LEVEL', 'debug'),
         ],
 
         'null' => [

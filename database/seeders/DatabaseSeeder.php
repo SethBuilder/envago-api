@@ -85,6 +85,12 @@ class DatabaseSeeder extends Seeder
             ['category' => 'rafting',      'name' => 'Rafting no Rio Coreaú',  'slug' => 'rafting-coreau',        'description' => 'Rafting nas corredeiras do Rio Coreaú.', 'price' => 180.00, 'duration' => 180, 'capacity' => 8, 'time' => '08:00:00'],
         ]);
 
+        // Pending providers (waiting for admin approval, not visible in feed)
+        $this->pending('Marcos Buggy Novo',    'marcos@buggy.com',    'Dunas Vivas Jeri',         'dunas-vivas-jeri',        '+55 88 99920-0001');
+        $this->pending('Fernanda Stand Up',    'fernanda@sup.com',    'SUP Jeri Escola',           'sup-jeri-escola',         '+55 88 99920-0002');
+        $this->pending('Ricardo Mergulho',     'ricardo@mergulho.com','Profundezas Jericoacoara',  'profundezas-jericoacoara','+55 88 99920-0003');
+        $this->pending('Tatiana Cavalgada',    'tatiana@cavalos.com', 'Cavalos da Dunas',          'cavalos-das-dunas',       '+55 88 99920-0004');
+
         $this->operator('Gabriel Nature', 'gabriel@nature.com', 'Wild Jeri', 'wild-jeri', '+55 88 99911-0011', [
             ['category' => 'wildlife-safari',    'name' => 'Safari de Vida Selvagem','slug' => 'safari-jeri',     'description' => 'Observação de animais nativos da caatinga e mata.', 'price' => 140.00, 'duration' => 240, 'capacity' => 6, 'time' => '06:00:00'],
             ['category' => 'expeditions',        'name' => 'Expedição Jericoacoara', 'slug' => 'expedicao-jeri',  'description' => 'Expedição completa por Jeri e arredores em 2 dias.', 'price' => 450.00, 'duration' => 480, 'capacity' => 8, 'time' => '07:00:00'],
@@ -103,6 +109,19 @@ class DatabaseSeeder extends Seeder
             ['category' => 'skiing',       'name' => 'Esqui na Serra Gaúcha',  'slug' => 'esqui-serra-gaucha',    'description' => 'Esqui nas encostas nevadas da Serra Gaúcha.', 'price' => 520.00, 'duration' => 240, 'capacity' => 4, 'time' => '09:00:00'],
             ['category' => 'snow-boarding','name' => 'Snowboard no Sul',       'slug' => 'snowboard-sul',         'description' => 'Snowboard nas pistas do sul do Brasil.', 'price' => 480.00, 'duration' => 240, 'capacity' => 4, 'time' => '09:00:00'],
         ]);
+    }
+
+    private function pending(string $name, string $email, string $business, string $slug, string $whatsapp): void
+    {
+        $user = User::firstOrCreate(
+            ['email' => $email],
+            ['name' => $name, 'password' => Hash::make('Praia847!'), 'role' => 'provider', 'email_verified_at' => now()]
+        );
+
+        Provider::firstOrCreate(
+            ['user_id' => $user->id],
+            ['business_name' => $business, 'slug' => $slug, 'status' => 'pending', 'whatsapp_number' => $whatsapp]
+        );
     }
 
     private function operator(string $name, string $email, string $business, string $slug, string $whatsapp, array $tours): void
