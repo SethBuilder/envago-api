@@ -19,11 +19,19 @@ class Media extends Model
     // This means switching to S3 only requires changing the disk config.
     public function getUrlAttribute(string $value): string
     {
+        // Normalise: strip any stored domain prefix, keep just the storage path
         if (str_starts_with($value, 'http')) {
-            return $value;
+            if (preg_match('#/storage/(.+)$#', $value, $m)) {
+                $value = $m[1];
+            } else {
+                return $value;
+            }
         }
 
-        $disk = config('filesystems.default') === 's3' ? 's3' : 'public';
-        return Storage::disk($disk)->url($value);
+        if (config('filesystems.default') === 's3') {
+            return Storage::disk('s3')->url($value);
+        }
+
+        return rtrim(config('app.api_url'), '/') . '/storage/' . $value;
     }
 }
