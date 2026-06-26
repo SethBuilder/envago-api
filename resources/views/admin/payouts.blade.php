@@ -28,7 +28,7 @@
       <tbody>
         @foreach($schedules as $row)
         @php $schedule = $row['schedule']; $provider = $row['provider']; @endphp
-        <tr>
+        <tr style="{{ $row['pending_amount'] > 0 ? 'background:#fff5f5;' : '' }}">
           <td style="font-weight:500;">{{ $provider?->business_name ?? '—' }}</td>
           <td style="font-size:13px;">{{ $schedule->activity->name }}</td>
           <td style="font-size:13px; color:#888; white-space:nowrap;">

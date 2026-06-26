@@ -2,160 +2,304 @@
 @section('title', 'Configurações')
 @section('page-title', 'Configurações')
 
-@section('content')
+@push('styles')
+<style>
+.settings-wrap { max-width: 600px; }
 
+/* Section */
+.cfg-section { background: #fff; border: 1px solid #e8e8e8; border-radius: 12px; margin-bottom: 16px; overflow: hidden; }
+.cfg-section-head { padding: 18px 24px 0; }
+.cfg-section-title { font-size: 15px; font-weight: 600; color: #111; }
+.cfg-section-desc { font-size: 13px; color: #888; margin-top: 3px; }
+.cfg-divider { height: 1px; background: #f0f0f0; margin: 18px 24px 0; }
+.cfg-body { padding: 20px 24px 24px; display: flex; flex-direction: column; gap: 14px; }
+
+/* Fields */
+.field-group { display: flex; flex-direction: column; gap: 5px; }
+.field-label { font-size: 13px; font-weight: 500; color: #444; }
+.field-input {
+  width: 100%; padding: 9px 12px;
+  border: 1px solid #ddd; border-radius: 8px;
+  font-size: 14px; font-family: inherit; color: #111;
+  background: #fafafa; outline: none; box-sizing: border-box;
+  transition: border-color .15s, background .15s, box-shadow .15s;
+}
+.field-input:disabled { color: #111; -webkit-text-fill-color: #111; cursor: default; }
+.field-input:not(:disabled) { background: #fff; }
+.field-input:not(:disabled):focus { border-color: #111; box-shadow: 0 0 0 3px rgba(0,0,0,.06); }
+.field-col2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.field-col3-1 { display: grid; grid-template-columns: 2fr 1fr; gap: 12px; }
+.field-col1-3 { display: grid; grid-template-columns: 1fr 2fr; gap: 12px; }
+
+/* Action bar */
+.cfg-actions { padding: 0 24px 24px; display: flex; gap: 8px; }
+.cfg-btn {
+  display: inline-flex; align-items: center; gap: 7px;
+  padding: 10px 18px; border-radius: 8px; font-size: 13px; font-weight: 600;
+  cursor: pointer; border: none; transition: opacity .15s, transform .1s;
+}
+.cfg-btn:active { transform: scale(.98); }
+.cfg-btn-primary { background: #111; color: #fff; flex: 1; justify-content: center; }
+.cfg-btn-primary:hover { opacity: .85; }
+.cfg-btn-ghost { background: #f4f4f4; color: #555; }
+.cfg-btn-ghost:hover { background: #ebebeb; }
+.cfg-btn-edit { background: #111; color: #fff; width: 100%; justify-content: center; padding: 11px 18px; }
+.cfg-btn-edit:hover { opacity: .85; }
+</style>
+@endpush
+
+@section('content')
+@php $bank = $provider?->bank_details ?? []; @endphp
+
+{{-- Toast --}}
 @if(session('success'))
-<div style="background:#e8f5e9; border:1px solid #c8e6c9; border-radius:10px; padding:14px 20px; margin-bottom:24px; font-size:14px; color:#2e7d32; font-weight:500;">
+<div id="success-toast" style="position:fixed;bottom:28px;right:28px;z-index:9999;background:#111;color:#fff;padding:14px 20px;border-radius:10px;font-size:14px;font-weight:500;box-shadow:0 8px 32px rgba(0,0,0,.18);display:flex;align-items:center;gap:10px;max-width:340px;">
+  <svg width="18" height="18" fill="none" viewBox="0 0 24 24"><circle cx="12" cy="12" r="11" fill="#22c55e"/><path d="M7 12.5l3.5 3.5 6.5-7" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
   {{ session('success') }}
 </div>
+<script>setTimeout(()=>{const t=document.getElementById('success-toast');if(t){t.style.transition='opacity .4s';t.style.opacity='0';setTimeout(()=>t.remove(),400);}},3500);</script>
 @endif
 
 @if($errors->any())
-<div style="background:#fff5f5; border:1px solid #ffcdd2; border-radius:10px; padding:14px 20px; margin-bottom:24px;">
-  <p style="font-size:13px; font-weight:600; color:#c62828; margin:0 0 8px;">Por favor corrija os erros abaixo:</p>
-  <ul style="margin:0; padding-left:18px;">
-    @foreach($errors->all() as $error)
-      <li style="font-size:13px; color:#c62828; margin-bottom:2px;">{{ $error }}</li>
-    @endforeach
-  </ul>
+<div style="background:#fff5f5;border:1px solid #fca5a5;border-radius:10px;padding:14px 20px;margin-bottom:16px;max-width:600px;">
+  @foreach($errors->all() as $error)
+    <p style="font-size:13px;color:#c62828;margin:0 0 2px;">{{ $error }}</p>
+  @endforeach
 </div>
 @endif
 
-<form method="POST" action="{{ route('provider.settings.update') }}" style="max-width:560px;">
-  @csrf
-  @method('PUT')
+<div class="settings-wrap">
 
-  {{-- WhatsApp --}}
-  <div class="section" style="margin-bottom:20px;">
-    <div class="section-header"><span class="section-title">Contato</span></div>
-    <div style="padding:24px;">
-      <label style="display:block; font-size:12px; font-weight:600; color:#888; text-transform:uppercase; letter-spacing:.7px; margin-bottom:8px;">WhatsApp</label>
-      <input type="text" name="whatsapp_number" value="{{ old('whatsapp_number', $provider?->whatsapp_number) }}"
-        placeholder="+55 88 99999-9999"
-        style="width:100%; padding:10px 14px; border:1.5px solid #e5e5e5; border-radius:8px; font-size:14px; font-family:inherit; outline:none; box-sizing:border-box;">
-    </div>
-  </div>
-
-  {{-- Bank details for SWIFT payout --}}
-  @php $bank = $provider?->bank_details ?? []; @endphp
-  <div class="section" style="margin-bottom:20px;">
-    <div class="section-header">
-      <span class="section-title">Dados bancários para recebimento</span>
-      @if(!empty($bank))
-        <span class="badge badge-confirmed" style="font-size:11px;">✓ Cadastrado</span>
-      @else
-        <span class="badge badge-pending" style="font-size:11px;">Pendente</span>
-      @endif
-    </div>
-    <div style="padding:24px; display:flex; flex-direction:column; gap:16px;">
-      <p style="font-size:13px; color:#888; margin:0;">Esses dados são usados para transferência bancária internacional (SWIFT). Preenchimento obrigatório para receber repasses.</p>
-
-      @php
-        $field = fn($label, $name, $placeholder) => "
-          <div>
-            <label style='display:block; font-size:12px; font-weight:600; color:#888; text-transform:uppercase; letter-spacing:.7px; margin-bottom:6px;'>$label</label>
-            <input type='text' name='$name' value='" . old($name, $bank[str_replace('bank_','',$name)] ?? '') . "'
-              placeholder='$placeholder'
-              style='width:100%; padding:10px 14px; border:1.5px solid #e5e5e5; border-radius:8px; font-size:14px; font-family:inherit; outline:none; box-sizing:border-box;'>
+  {{-- Logo (separate form so it can submit independently) --}}
+  <form method="POST" action="{{ route('provider.settings.update') }}" id="logo-form" enctype="multipart/form-data">
+    @csrf @method('PUT')
+    <div class="cfg-section">
+      <div class="cfg-section-head">
+        <div class="cfg-section-title">Logo</div>
+        <div class="cfg-section-desc">Aparece na sua página pública no envago.live</div>
+      </div>
+      <div class="cfg-divider"></div>
+      <div class="cfg-body" style="flex-direction:row; align-items:center; gap:16px; flex-wrap:wrap;">
+        <div id="logo-preview" style="width:64px;height:64px;border-radius:10px;border:1px solid #e8e8e8;overflow:hidden;flex-shrink:0;display:flex;align-items:center;justify-content:center;background:#f7f7f7;">
+          @if($provider?->logo_url)
+            <img src="{{ $provider->logo_url }}" style="width:100%;height:100%;object-fit:cover;">
+          @else
+            <svg width="24" height="24" fill="none" stroke="#ccc" stroke-width="1.5" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+          @endif
+        </div>
+        <div style="flex:1;min-width:200px;">
+          <input type="file" name="logo" id="logo-input" accept="image/*" style="display:none;" onchange="onLogoSelected(this)">
+          <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+            <button type="button" onclick="document.getElementById('logo-input').click()" class="cfg-btn cfg-btn-ghost" style="font-size:13px;">
+              <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+              Escolher imagem
+            </button>
+            <button type="submit" id="logo-save-btn" class="cfg-btn cfg-btn-primary" style="display:none;flex:none;">
+              Salvar logo
+            </button>
+            <button type="button" id="logo-cancel-btn" onclick="cancelLogo()" class="cfg-btn cfg-btn-ghost" style="display:none;">
+              Cancelar
+            </button>
           </div>
-        ";
-      @endphp
-
-      <div>
-        <label style="display:block; font-size:12px; font-weight:600; color:#888; text-transform:uppercase; letter-spacing:.7px; margin-bottom:6px;">Nome do beneficiário</label>
-        <input type="text" name="bank_beneficiary" value="{{ old('bank_beneficiary', $bank['beneficiary'] ?? '') }}"
-          placeholder="Nome completo ou razão social"
-          style="width:100%; padding:10px 14px; border:1.5px solid #e5e5e5; border-radius:8px; font-size:14px; font-family:inherit; outline:none; box-sizing:border-box;">
-      </div>
-
-      <div>
-        <label style="display:block; font-size:12px; font-weight:600; color:#888; text-transform:uppercase; letter-spacing:.7px; margin-bottom:6px;">CPF / CNPJ</label>
-        <input type="text" name="bank_cpf_cnpj" value="{{ old('bank_cpf_cnpj', $bank['cpf_cnpj'] ?? '') }}"
-          placeholder="000.000.000-00"
-          style="width:100%; padding:10px 14px; border:1.5px solid #e5e5e5; border-radius:8px; font-size:14px; font-family:inherit; outline:none; box-sizing:border-box;">
-      </div>
-
-      <div>
-        <label style="display:block; font-size:12px; font-weight:600; color:#888; text-transform:uppercase; letter-spacing:.7px; margin-bottom:6px;">Banco</label>
-        <input type="text" name="bank_name" value="{{ old('bank_name', $bank['bank_name'] ?? '') }}"
-          placeholder="ex: Itaú, Nubank, Banco do Brasil"
-          style="width:100%; padding:10px 14px; border:1.5px solid #e5e5e5; border-radius:8px; font-size:14px; font-family:inherit; outline:none; box-sizing:border-box;">
-      </div>
-
-      {{-- Address --}}
-      <div>
-        <label style="display:block; font-size:12px; font-weight:600; color:#888; text-transform:uppercase; letter-spacing:.7px; margin-bottom:6px;">Endereço</label>
-        <input type="text" name="bank_address" value="{{ old('bank_address', $bank['address'] ?? '') }}"
-          placeholder="ex: Rua das Dunas, 123"
-          style="width:100%; padding:10px 14px; border:1.5px solid #e5e5e5; border-radius:8px; font-size:14px; font-family:inherit; outline:none; box-sizing:border-box;">
-      </div>
-
-      <div style="display:grid; grid-template-columns:2fr 1fr; gap:12px;">
-        <div>
-          <label style="display:block; font-size:12px; font-weight:600; color:#888; text-transform:uppercase; letter-spacing:.7px; margin-bottom:6px;">Cidade</label>
-          <input type="text" name="bank_city" value="{{ old('bank_city', $bank['city'] ?? '') }}"
-            placeholder="ex: Jericoacoara"
-            style="width:100%; padding:10px 14px; border:1.5px solid #e5e5e5; border-radius:8px; font-size:14px; font-family:inherit; outline:none; box-sizing:border-box;">
-        </div>
-        <div>
-          <label style="display:block; font-size:12px; font-weight:600; color:#888; text-transform:uppercase; letter-spacing:.7px; margin-bottom:6px;">Estado (UF)</label>
-          <input type="text" name="bank_state" value="{{ old('bank_state', $bank['state'] ?? '') }}"
-            placeholder="ex: CE"
-            maxlength="2"
-            style="width:100%; padding:10px 14px; border:1.5px solid #e5e5e5; border-radius:8px; font-size:14px; font-family:inherit; outline:none; box-sizing:border-box; text-transform:uppercase;">
-        </div>
-      </div>
-
-      <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
-        <div>
-          <label style="display:block; font-size:12px; font-weight:600; color:#888; text-transform:uppercase; letter-spacing:.7px; margin-bottom:6px;">CEP</label>
-          <input type="text" name="bank_postcode" value="{{ old('bank_postcode', $bank['postcode'] ?? '') }}"
-            placeholder="ex: 62598-000"
-            style="width:100%; padding:10px 14px; border:1.5px solid #e5e5e5; border-radius:8px; font-size:14px; font-family:inherit; outline:none; box-sizing:border-box;">
-        </div>
-        <div>
-          <label style="display:block; font-size:12px; font-weight:600; color:#888; text-transform:uppercase; letter-spacing:.7px; margin-bottom:6px;">Tipo de conta</label>
-          <select name="bank_account_type"
-            style="width:100%; padding:10px 14px; border:1.5px solid #e5e5e5; border-radius:8px; font-size:14px; font-family:inherit; outline:none; box-sizing:border-box; background:#fff;">
-            <option value="">Selecionar...</option>
-            <option value="corrente" {{ old('bank_account_type', $bank['account_type'] ?? '') === 'corrente' ? 'selected' : '' }}>Conta Corrente</option>
-            <option value="poupanca" {{ old('bank_account_type', $bank['account_type'] ?? '') === 'poupanca' ? 'selected' : '' }}>Conta Poupança</option>
-          </select>
-        </div>
-      </div>
-
-      <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
-        <div>
-          <label style="display:block; font-size:12px; font-weight:600; color:#888; text-transform:uppercase; letter-spacing:.7px; margin-bottom:6px;">SWIFT / BIC</label>
-          <input type="text" name="bank_swift" value="{{ old('bank_swift', $bank['swift'] ?? '') }}"
-            placeholder="ex: ITAUBRSP"
-            style="width:100%; padding:10px 14px; border:1.5px solid #e5e5e5; border-radius:8px; font-size:14px; font-family:monospace; outline:none; box-sizing:border-box;">
-        </div>
-        <div>
-          <label style="display:block; font-size:12px; font-weight:600; color:#888; text-transform:uppercase; letter-spacing:.7px; margin-bottom:6px;">Agência</label>
-          <input type="text" name="bank_branch" value="{{ old('bank_branch', $bank['branch'] ?? '') }}"
-            placeholder="ex: 0001"
-            style="width:100%; padding:10px 14px; border:1.5px solid #e5e5e5; border-radius:8px; font-size:14px; font-family:inherit; outline:none; box-sizing:border-box;">
-        </div>
-      </div>
-
-      <div style="display:grid; grid-template-columns:2fr 1fr; gap:12px;">
-        <div>
-          <label style="display:block; font-size:12px; font-weight:600; color:#888; text-transform:uppercase; letter-spacing:.7px; margin-bottom:6px;">Número da conta</label>
-          <input type="text" name="bank_account" value="{{ old('bank_account', $bank['account'] ?? '') }}"
-            placeholder="ex: 12345-6"
-            style="width:100%; padding:10px 14px; border:1.5px solid #e5e5e5; border-radius:8px; font-size:14px; font-family:inherit; outline:none; box-sizing:border-box;">
-        </div>
-        <div>
-          <label style="display:block; font-size:12px; font-weight:600; color:#888; text-transform:uppercase; letter-spacing:.7px; margin-bottom:6px;">País</label>
-          <input type="text" value="Brasil" disabled
-            style="width:100%; padding:10px 14px; border:1.5px solid #e5e5e5; border-radius:8px; font-size:14px; font-family:inherit; background:#f9f9f9; color:#aaa; box-sizing:border-box;">
+          <p id="logo-hint" style="font-size:12px;color:#aaa;margin-top:6px;">PNG ou JPG · máx. 2 MB</p>
+          <p id="logo-filename" style="display:none;font-size:12px;color:#666;margin-top:6px;"></p>
         </div>
       </div>
     </div>
-  </div>
+  </form>
 
-  <button type="submit" class="btn btn-primary">Salvar configurações</button>
-</form>
+  {{-- Main settings form --}}
+  <form method="POST" action="{{ route('provider.settings.update') }}" id="settings-form">
+    @csrf @method('PUT')
+
+    {{-- Contact --}}
+    <div class="cfg-section">
+      <div class="cfg-section-head">
+        <div class="cfg-section-title">Contato</div>
+      </div>
+      <div class="cfg-divider"></div>
+      <div class="cfg-body">
+        <div class="field-group">
+          <label class="field-label">WhatsApp</label>
+          <input type="text" name="whatsapp_number" value="{{ old('whatsapp_number', $provider?->whatsapp_number) }}"
+            placeholder="+55 88 99999-9999" disabled class="field-input">
+        </div>
+      </div>
+    </div>
+
+    {{-- Bank details --}}
+    <div class="cfg-section">
+      <div class="cfg-section-head" style="display:flex;align-items:flex-start;justify-content:space-between;">
+        <div>
+          <div class="cfg-section-title">Dados bancários</div>
+          <div class="cfg-section-desc">Para receber repasses via transferência bancária</div>
+        </div>
+        @if(!empty($bank))
+          <span class="badge badge-confirmed" style="font-size:11px;margin-top:2px;">✓ Cadastrado</span>
+        @else
+          <span class="badge badge-pending" style="font-size:11px;margin-top:2px;">Pendente</span>
+        @endif
+      </div>
+      <div class="cfg-divider"></div>
+      <div class="cfg-body">
+
+        <div class="field-group">
+          <label class="field-label">Nome do beneficiário</label>
+          <input type="text" name="bank_beneficiary" value="{{ old('bank_beneficiary', $bank['beneficiary'] ?? '') }}"
+            placeholder="Nome completo ou razão social" disabled class="field-input">
+        </div>
+
+        <div class="field-col2">
+          <div class="field-group">
+            <label class="field-label">CPF / CNPJ</label>
+            <input type="text" name="bank_cpf_cnpj" value="{{ old('bank_cpf_cnpj', $bank['cpf_cnpj'] ?? '') }}"
+              placeholder="000.000.000-00" disabled class="field-input">
+          </div>
+          <div class="field-group">
+            <label class="field-label">Banco</label>
+            <input type="text" name="bank_name" value="{{ old('bank_name', $bank['bank_name'] ?? '') }}"
+              placeholder="ex: Itaú, Nubank" disabled class="field-input">
+          </div>
+        </div>
+
+        <div class="field-group">
+          <label class="field-label">Endereço</label>
+          <input type="text" name="bank_address" value="{{ old('bank_address', $bank['address'] ?? '') }}"
+            placeholder="ex: Rua das Dunas, 123" disabled class="field-input">
+        </div>
+
+        <div class="field-col3-1">
+          <div class="field-group">
+            <label class="field-label">Cidade</label>
+            <input type="text" name="bank_city" value="{{ old('bank_city', $bank['city'] ?? '') }}"
+              placeholder="ex: Jericoacoara" disabled class="field-input">
+          </div>
+          <div class="field-group">
+            <label class="field-label">Estado (UF)</label>
+            <input type="text" name="bank_state" value="{{ old('bank_state', $bank['state'] ?? '') }}"
+              placeholder="CE" maxlength="2" disabled class="field-input">
+          </div>
+        </div>
+
+        <div class="field-col2">
+          <div class="field-group">
+            <label class="field-label">CEP</label>
+            <input type="text" name="bank_postcode" value="{{ old('bank_postcode', $bank['postcode'] ?? '') }}"
+              placeholder="62598-000" disabled class="field-input">
+          </div>
+          <div class="field-group">
+            <label class="field-label">Tipo de conta</label>
+            <select name="bank_account_type" disabled class="field-input">
+              <option value="">Selecionar...</option>
+              <option value="corrente" {{ old('bank_account_type', $bank['account_type'] ?? '') === 'corrente' ? 'selected' : '' }}>Conta Corrente</option>
+              <option value="poupanca" {{ old('bank_account_type', $bank['account_type'] ?? '') === 'poupanca' ? 'selected' : '' }}>Conta Poupança</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="field-col2">
+          <div class="field-group">
+            <label class="field-label">SWIFT / BIC</label>
+            <input type="text" name="bank_swift" value="{{ old('bank_swift', $bank['swift'] ?? '') }}"
+              placeholder="ex: ITAUBRSP" disabled class="field-input" style="font-family:monospace;letter-spacing:.5px;">
+          </div>
+          <div class="field-group">
+            <label class="field-label">Agência</label>
+            <input type="text" name="bank_branch" value="{{ old('bank_branch', $bank['branch'] ?? '') }}"
+              placeholder="ex: 0001" disabled class="field-input">
+          </div>
+        </div>
+
+        <div class="field-col3-1">
+          <div class="field-group">
+            <label class="field-label">Número da conta</label>
+            <input type="text" name="bank_account" value="{{ old('bank_account', $bank['account'] ?? '') }}"
+              placeholder="ex: 12345-6" disabled class="field-input">
+          </div>
+          <div class="field-group">
+            <label class="field-label">País</label>
+            <input type="text" value="Brasil" disabled data-always-disabled class="field-input" style="color:#aaa;-webkit-text-fill-color:#aaa;">
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    {{-- Action bar --}}
+    <div id="bar-view" class="cfg-actions" style="padding-left:0;padding-right:0;">
+      <button type="button" onclick="enableEdit()" class="cfg-btn cfg-btn-edit">
+        <svg width="15" height="15" fill="none" viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        Editar informações
+      </button>
+    </div>
+
+    <div id="bar-edit" class="cfg-actions" style="display:none;padding-left:0;padding-right:0;">
+      <button type="button" onclick="cancelEdit()" class="cfg-btn cfg-btn-ghost">
+        Cancelar
+      </button>
+      <button type="submit" class="cfg-btn cfg-btn-primary">
+        <svg width="14" height="14" fill="none" viewBox="0 0 24 24"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><polyline points="17 21 17 13 7 13 7 21" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><polyline points="7 3 7 8 15 8" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        Salvar alterações
+      </button>
+    </div>
+
+  </form>
+</div>
+
+<script>
+const originalValues = {};
+
+function onLogoSelected(input) {
+  if (!input.files[0]) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    document.getElementById('logo-preview').innerHTML =
+      '<img src="' + e.target.result + '" style="width:100%;height:100%;object-fit:cover;">';
+  };
+  reader.readAsDataURL(input.files[0]);
+  document.getElementById('logo-filename').textContent = input.files[0].name;
+  document.getElementById('logo-filename').style.display = 'block';
+  document.getElementById('logo-hint').style.display = 'none';
+  document.getElementById('logo-save-btn').style.display = 'inline-flex';
+  document.getElementById('logo-cancel-btn').style.display = 'inline-flex';
+}
+
+function cancelLogo() {
+  document.getElementById('logo-input').value = '';
+  document.getElementById('logo-save-btn').style.display = 'none';
+  document.getElementById('logo-cancel-btn').style.display = 'none';
+  document.getElementById('logo-filename').style.display = 'none';
+  document.getElementById('logo-hint').style.display = 'block';
+  @if($provider?->logo_url)
+  document.getElementById('logo-preview').innerHTML =
+    '<img src="{{ $provider->logo_url }}" style="width:100%;height:100%;object-fit:cover;">';
+  @else
+  document.getElementById('logo-preview').innerHTML =
+    '<svg width="24" height="24" fill="none" stroke="#ccc" stroke-width="1.5" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>';
+  @endif
+}
+
+function enableEdit() {
+  document.querySelectorAll('#settings-form .field-input').forEach(el => {
+    const key = el.getAttribute('name');
+    if (key) originalValues[key] = el.value;
+    if (!el.dataset.alwaysDisabled) el.disabled = false;
+  });
+  document.getElementById('bar-view').style.display = 'none';
+  document.getElementById('bar-edit').style.display = 'flex';
+}
+
+function cancelEdit() {
+  document.querySelectorAll('#settings-form .field-input').forEach(el => {
+    const key = el.getAttribute('name');
+    if (key && originalValues[key] !== undefined) el.value = originalValues[key];
+    if (!el.dataset.alwaysDisabled) el.disabled = true;
+  });
+  document.getElementById('bar-view').style.display = 'flex';
+  document.getElementById('bar-edit').style.display = 'none';
+}
+
+@if($errors->any()) enableEdit(); @endif
+</script>
 
 @endsection

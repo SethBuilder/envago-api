@@ -42,6 +42,8 @@ class PayoutController extends Controller
                 ];
             });
 
+        $schedules = $schedules->sortByDesc('pending_amount')->values();
+
         return view('admin.payouts', compact('schedules'));
     }
 
@@ -90,8 +92,12 @@ class PayoutController extends Controller
         abort_unless($payout->confirmation_path, 404);
 
         $disk = config('filesystems.default') === 's3' ? 's3' : 'local';
-        $url  = Storage::disk($disk)->temporaryUrl($payout->confirmation_path, now()->addMinutes(5));
 
-        return redirect($url);
+        if ($disk === 's3') {
+            return redirect(Storage::disk('s3')->temporaryUrl($payout->confirmation_path, now()->addMinutes(5)));
+        }
+
+        abort_unless(Storage::disk('local')->exists($payout->confirmation_path), 404);
+        return Storage::disk('local')->download($payout->confirmation_path);
     }
 }

@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Provider;
 
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Storage;
 
 class SettingsController extends Controller
 {
@@ -16,6 +17,7 @@ class SettingsController extends Controller
     public function update(Request $request)
     {
         $request->validate([
+            'logo'                 => 'nullable|image|mimes:jpeg,png,jpg,gif,webp|max:2048',
             'whatsapp_number'      => 'nullable|string|max:20',
             'bank_beneficiary'     => 'nullable|string|max:120',
             'bank_cpf_cnpj'        => 'nullable|string|max:20',
@@ -31,6 +33,17 @@ class SettingsController extends Controller
         ]);
 
         $provider = auth()->user()->provider;
+
+        $logoUrl = $provider->logo_url;
+        if ($request->hasFile('logo')) {
+            $disk = config('filesystems.default') === 's3' ? 's3' : 'public';
+            if ($provider->logo_url) {
+                $oldPath = str_replace(Storage::disk($disk)->url(''), '', $provider->logo_url);
+                Storage::disk($disk)->delete($oldPath);
+            }
+            $path    = $request->file('logo')->store('logos', ['disk' => $disk, 'visibility' => 'public']);
+            $logoUrl = Storage::disk($disk)->url($path);
+        }
 
         $bankDetails = array_filter([
             'beneficiary'  => $request->bank_beneficiary,
@@ -48,6 +61,7 @@ class SettingsController extends Controller
         ]);
 
         $provider->update([
+            'logo_url'        => $logoUrl,
             'whatsapp_number' => $request->whatsapp_number,
             'bank_details'    => !empty($bankDetails) ? $bankDetails : $provider->bank_details,
         ]);

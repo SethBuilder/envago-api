@@ -48,14 +48,39 @@ class DashboardController extends Controller
         return view('provider.dashboard', compact('provider', 'stats', 'grouped'));
     }
 
+    public function bookings()
+    {
+        $provider = auth()->user()->provider;
+        abort_unless($provider, 403);
+
+        $activityIds = $provider->activities()->pluck('id');
+
+        $bookings = Booking::whereHas('schedule', fn($q) => $q->whereIn('activity_id', $activityIds))
+            ->with('schedule.activity')
+            ->orderByDesc('created_at')
+            ->get();
+
+        return view('provider.bookings', compact('provider', 'bookings'));
+    }
+
+    public function activities()
+    {
+        $provider = auth()->user()->provider;
+        abort_unless($provider, 403);
+
+        $activities = $provider->activities()->with('category')->orderBy('name')->get();
+
+        return view('provider.activities', compact('provider', 'activities'));
+    }
+
     public function payouts()
     {
         $provider = auth()->user()->provider;
         abort_unless($provider, 403);
 
-        $payouts = Payout::with(['booking.schedule.activity'])
+        $payouts = Payout::with(['schedule.activity'])
             ->where('provider_id', $provider->id)
-            ->orderByDesc('created_at')
+            ->orderByDesc('paid_at')
             ->get();
 
         return view('provider.payouts', compact('provider', 'payouts'));
@@ -67,9 +92,13 @@ class DashboardController extends Controller
         abort_unless($payout->provider_id === $provider->id && $payout->confirmation_path, 403);
 
         $disk = config('filesystems.default') === 's3' ? 's3' : 'local';
-        $url  = Storage::disk($disk)->temporaryUrl($payout->confirmation_path, now()->addMinutes(5));
 
-        return redirect($url);
+        if ($disk === 's3') {
+            return redirect(Storage::disk('s3')->temporaryUrl($payout->confirmation_path, now()->addMinutes(5)));
+        }
+
+        abort_unless(Storage::disk('local')->exists($payout->confirmation_path), 404);
+        return Storage::disk('local')->download($payout->confirmation_path);
     }
 
     public function cancelBookings(Request $request)

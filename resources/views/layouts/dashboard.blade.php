@@ -139,16 +139,57 @@
   .empty-icon { font-size: 36px; margin-bottom: 12px; }
   .empty p { font-size: 14px; }
 
-  @media (max-width: 768px) {
-    .sidebar { transform: translateX(-100%); }
-    .main { margin-left: 0; }
+  /* Mobile sidebar */
+  .sidebar-overlay {
+    display: none;
+    position: fixed; inset: 0; background: rgba(0,0,0,.4); z-index: 99;
   }
+  .hamburger {
+    display: none;
+    background: none; border: none; cursor: pointer; padding: 4px; color: #111;
+  }
+
+  @media (max-width: 768px) {
+    .sidebar { transform: translateX(-100%); transition: transform .25s ease; }
+    .sidebar.open { transform: translateX(0); }
+    .sidebar-overlay.open { display: block; }
+    .main { margin-left: 0; }
+    .hamburger { display: flex; align-items: center; }
+    .content { padding: 20px 16px; }
+    .topbar { padding: 0 16px; }
+  }
+
+  /* Profile dropdown */
+  .topbar-user { position: relative; cursor: pointer; user-select: none; }
+  .topbar-user:hover .topbar-avatar { opacity: .85; }
+  .profile-dropdown {
+    display: none;
+    position: absolute; top: calc(100% + 8px); right: 0;
+    background: #fff; border: 1px solid #ece9e4; border-radius: 10px;
+    box-shadow: 0 8px 24px rgba(0,0,0,.1); min-width: 180px; overflow: hidden; z-index: 200;
+  }
+  .profile-dropdown.open { display: block; }
+  .profile-dropdown-name {
+    padding: 12px 16px; font-size: 13px; font-weight: 600; color: #111;
+    border-bottom: 1px solid #f0ede8; pointer-events: none;
+  }
+  .profile-dropdown-item {
+    display: flex; align-items: center; gap: 10px;
+    padding: 10px 16px; font-size: 13px; color: #555;
+    text-decoration: none; cursor: pointer; width: 100%;
+    background: none; border: none; font-family: inherit; text-align: left;
+    transition: background .1s;
+  }
+  .profile-dropdown-item:hover { background: #f7f5f2; color: #111; }
+  .profile-dropdown-item.danger { color: #c62828; }
+  .profile-dropdown-item.danger:hover { background: #fff5f5; }
 </style>
 @stack('styles')
 </head>
 <body>
 
-<aside class="sidebar">
+<div class="sidebar-overlay" id="sidebar-overlay" onclick="closeSidebar()"></div>
+<aside class="sidebar" id="sidebar">
   <div class="sidebar-logo">
     <a href="{{ auth()->user()->isAdmin() ? route('admin.dashboard') : route('provider.dashboard') }}">
       <img src="/logo.svg" alt="Envago" style="height:32px; width:auto;">
@@ -179,11 +220,11 @@
         <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
         Dashboard
       </a>
-      <a href="#" class="nav-item">
+      <a href="{{ route('provider.bookings') }}" class="nav-item {{ request()->routeIs('provider.bookings') ? 'active' : '' }}">
         <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2"/><rect x="9" y="3" width="6" height="4" rx="1"/></svg>
         Reservas
       </a>
-      <a href="#" class="nav-item">
+      <a href="{{ route('provider.activities') }}" class="nav-item {{ request()->routeIs('provider.activities') ? 'active' : '' }}">
         <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
         Meus Passeios
       </a>
@@ -220,10 +261,38 @@
   </div>
   @endif
   <div class="topbar">
-    <span class="topbar-title">@yield('page-title')</span>
-    <div class="topbar-user">
-      <span>{{ auth()->user()->name }}</span>
-      <div class="topbar-avatar">{{ strtoupper(substr(auth()->user()->name, 0, 1)) }}</div>
+    <div style="display:flex; align-items:center; gap:12px;">
+      <button class="hamburger" onclick="openSidebar()" aria-label="Menu">
+        <svg width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+      </button>
+      <span class="topbar-title">@yield('page-title')</span>
+    </div>
+    <div class="topbar-user" onclick="toggleProfileDropdown()">
+      <span style="font-size:13px; color:#888;">{{ auth()->user()->name }}</span>
+      @php $__logo = auth()->user()->provider?->logo_url; @endphp
+      <div class="topbar-avatar" style="{{ $__logo ? 'background:none;padding:0;overflow:hidden;' : '' }}">
+        @if($__logo)
+          <img src="{{ $__logo }}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;">
+        @else
+          {{ strtoupper(substr(auth()->user()->name, 0, 1)) }}
+        @endif
+      </div>
+      <div class="profile-dropdown" id="profile-dropdown">
+        <div class="profile-dropdown-name">{{ auth()->user()->name }}</div>
+        @if(!auth()->user()->isAdmin())
+        <a href="{{ route('provider.settings') }}" class="profile-dropdown-item">
+          <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+          Configurações
+        </a>
+        @endif
+        <form method="POST" action="{{ route('logout') }}" style="margin:0;">
+          @csrf
+          <button type="submit" class="profile-dropdown-item danger">
+            <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+            Sair
+          </button>
+        </form>
+      </div>
     </div>
   </div>
 
@@ -233,6 +302,23 @@
 </div>
 
 @stack('scripts')
+<script>
+function openSidebar() {
+  document.getElementById('sidebar').classList.add('open');
+  document.getElementById('sidebar-overlay').classList.add('open');
+}
+function closeSidebar() {
+  document.getElementById('sidebar').classList.remove('open');
+  document.getElementById('sidebar-overlay').classList.remove('open');
+}
+function toggleProfileDropdown() {
+  document.getElementById('profile-dropdown').classList.toggle('open');
+}
+document.addEventListener('click', function(e) {
+  var user = e.target.closest('.topbar-user');
+  if (!user) document.getElementById('profile-dropdown').classList.remove('open');
+});
+</script>
 
 @php
 $__laraUser     = auth()->user();

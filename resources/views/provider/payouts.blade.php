@@ -18,7 +18,7 @@
         <tr>
           <th>Passeio</th>
           <th>Data do passeio</th>
-          <th>Turista</th>
+          <th>Reservas</th>
           <th>Valor</th>
           <th>Status</th>
           <th>Pago em</th>
@@ -27,14 +27,16 @@
       </thead>
       <tbody>
         @foreach($payouts as $payout)
-        @php
-          $booking  = $payout->booking;
-          $activity = $booking->schedule->activity;
-        @endphp
+        @php $activity = $payout->schedule?->activity; @endphp
         <tr>
-          <td style="font-weight:500;">{{ $activity->name }}</td>
-          <td style="font-size:13px; color:#888;">{{ $booking->schedule->date->format('d/m/Y') }}</td>
-          <td style="font-size:13px; color:#888;">{{ $booking->guest_name }}</td>
+          <td style="font-weight:500;">{{ $activity?->name ?? '—' }}</td>
+          <td style="font-size:13px; color:#888;">
+            {{ $payout->schedule?->date?->format('d/m/Y') ?? '—' }}
+            @if($payout->schedule?->time)
+              {{ substr($payout->schedule->time, 0, 5) }}
+            @endif
+          </td>
+          <td style="font-size:13px; color:#666;">{{ $payout->booking_count ?? '—' }}</td>
           <td style="font-weight:600;">R$ {{ number_format($payout->amount, 0, ',', '.') }}</td>
           <td>
             @if($payout->isPaid())

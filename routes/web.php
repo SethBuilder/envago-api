@@ -8,6 +8,7 @@ use App\Http\Controllers\Admin\PayoutController as AdminPayout;
 use App\Http\Controllers\Admin\ProviderController as AdminProvider;
 use App\Http\Controllers\Provider\DashboardController as ProviderDashboard;
 use App\Http\Controllers\Provider\SettingsController as ProviderSettings;
+use App\Http\Controllers\Provider\ActivityController as ProviderActivity;
 
 Route::get('/', function () {
     if (auth()->check()) {
@@ -54,6 +55,10 @@ Route::post('/stop-impersonating', [AdminProvider::class, 'stopImpersonating'])-
 // Provider
 Route::middleware(['auth', 'provider'])->prefix('provider')->name('provider.')->group(function () {
     Route::get('/',                              [ProviderDashboard::class, 'index'])->name('dashboard');
+    Route::get('/reservas',                      [ProviderDashboard::class, 'bookings'])->name('bookings');
+    Route::get('/passeios',                      [ProviderDashboard::class, 'activities'])->name('activities');
+    Route::get('/passeios/criar',                [ProviderActivity::class,  'create'])->name('activities.create');
+    Route::post('/passeios',                     [ProviderActivity::class,  'store'])->name('activities.store');
     Route::post('/bookings/cancel',              [ProviderDashboard::class, 'cancelBookings'])->name('bookings.cancel');
     Route::get('/pagamentos',                    [ProviderDashboard::class, 'payouts'])->name('payouts');
     Route::get('/pagamentos/{payout}/comprovante', [ProviderDashboard::class, 'downloadPayout'])->name('payouts.download');
