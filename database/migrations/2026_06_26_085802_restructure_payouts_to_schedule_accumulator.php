@@ -8,34 +8,44 @@ return new class extends Migration
 {
     public function up(): void
     {
-        // Track which bookings have been paid out
-        Schema::table('bookings', function (Blueprint $table) {
-            $table->foreignId('payout_id')->nullable()->constrained('payouts')->nullOnDelete();
-        });
+        if (!Schema::hasColumn('bookings', 'payout_id')) {
+            Schema::table('bookings', function (Blueprint $table) {
+                $table->foreignId('payout_id')->nullable()->constrained('payouts')->nullOnDelete();
+            });
+        }
 
-        // Payouts now represent a batch payment for a schedule, not a single booking
         Schema::table('payouts', function (Blueprint $table) {
-            $table->foreignId('schedule_id')->nullable()->constrained()->cascadeOnDelete();
-            $table->unsignedInteger('booking_count')->default(0);
-            $table->dropForeign(['booking_id']);
-            $table->dropColumn('booking_id');
+            if (!Schema::hasColumn('payouts', 'schedule_id')) {
+                $table->foreignId('schedule_id')->nullable()->constrained()->cascadeOnDelete();
+            }
+            if (!Schema::hasColumn('payouts', 'booking_count')) {
+                $table->unsignedInteger('booking_count')->default(0);
+            }
+            if (Schema::hasColumn('payouts', 'booking_id')) {
+                $table->dropForeign(['booking_id']);
+                $table->dropColumn('booking_id');
+            }
         });
     }
 
     public function down(): void
     {
         Schema::table('payouts', function (Blueprint $table) {
-            $table->foreignId('booking_id')->nullable()->constrained()->cascadeOnDelete()->after('id');
+            $table->foreignId('booking_id')->nullable()->constrained()->cascadeOnDelete();
         });
 
         Schema::table('payouts', function (Blueprint $table) {
-            $table->dropForeign(['schedule_id']);
-            $table->dropColumn(['schedule_id', 'booking_count']);
+            if (Schema::hasColumn('payouts', 'schedule_id')) {
+                $table->dropForeign(['schedule_id']);
+                $table->dropColumn(['schedule_id', 'booking_count']);
+            }
         });
 
         Schema::table('bookings', function (Blueprint $table) {
-            $table->dropForeign(['payout_id']);
-            $table->dropColumn('payout_id');
+            if (Schema::hasColumn('bookings', 'payout_id')) {
+                $table->dropForeign(['payout_id']);
+                $table->dropColumn('payout_id');
+            }
         });
     }
 };
