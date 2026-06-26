@@ -13,7 +13,17 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware): void {
-        //
+        $middleware->alias([
+            'admin'    => \App\Http\Middleware\AdminMiddleware::class,
+            'provider' => \App\Http\Middleware\ProviderMiddleware::class,
+        ]);
+        $middleware->redirectGuestsTo('/login');
+        $middleware->redirectUsersTo(function () {
+            $user = auth()->user();
+            if ($user?->isAdmin()) return route('admin.dashboard');
+            if ($user?->isProvider()) return route('provider.dashboard');
+            return '/login';
+        });
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         $exceptions->shouldRenderJsonWhen(
