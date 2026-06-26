@@ -1,11 +1,6 @@
 #!/bin/bash
 set -e
 
-# Load EB environment variables (not available in hooks by default)
-for f in /opt/elasticbeanstalk/deployment/env /opt/elasticbeanstalk/support/envvars; do
-    [ -f "$f" ] && source "$f" && break
-done
-
 APP=/var/app/current
 
 mkdir -p "$APP/storage/framework/sessions" \
@@ -16,11 +11,7 @@ mkdir -p "$APP/storage/framework/sessions" \
          "$APP/bootstrap/cache"
 
 cd "$APP"
-if [ "${FRESH_MIGRATE}" = "true" ]; then
-    php artisan migrate:fresh --force --seed
-else
-    php artisan migrate --force
-fi
+php artisan migrate --force
 php artisan storage:link --force
 php artisan config:cache
 php artisan route:cache
