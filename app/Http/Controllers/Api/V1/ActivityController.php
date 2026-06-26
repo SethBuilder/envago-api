@@ -12,7 +12,8 @@ class ActivityController extends Controller
     public function index(Request $request)
     {
         $query = Activity::with(['category', 'cover', 'provider', 'reviews'])
-            ->where('is_active', true);
+            ->where('is_active', true)
+            ->whereHas('provider', fn($q) => $q->where('status', 'approved'));
 
         if ($request->filled('category')) {
             $query->whereHas('category', fn($q) => $q->where('slug', $request->category));
