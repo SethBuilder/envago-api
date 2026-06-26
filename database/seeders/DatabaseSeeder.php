@@ -8,6 +8,7 @@ use App\Models\User;
 use App\Models\Provider;
 use App\Models\Category;
 use App\Models\Activity;
+use App\Models\Media;
 use App\Models\Schedule;
 use Carbon\Carbon;
 
@@ -153,6 +154,11 @@ class DatabaseSeeder extends Seeder
                     'state'            => 'CE',
                     'is_active'        => true,
                 ]
+            );
+
+            Media::firstOrCreate(
+                ['activity_id' => $activity->id, 'type' => 'cover'],
+                ['url' => 'https://picsum.photos/seed/' . $t['slug'] . '/800/500', 'order' => 0]
             );
 
             for ($i = 0; $i < 30; $i++) {
