@@ -10,13 +10,13 @@ return new class extends Migration
     {
         // Track which bookings have been paid out
         Schema::table('bookings', function (Blueprint $table) {
-            $table->foreignId('payout_id')->nullable()->constrained('payouts')->nullOnDelete()->after('reference');
+            $table->foreignId('payout_id')->nullable()->constrained('payouts')->nullOnDelete();
         });
 
         // Payouts now represent a batch payment for a schedule, not a single booking
         Schema::table('payouts', function (Blueprint $table) {
-            $table->foreignId('schedule_id')->nullable()->constrained()->cascadeOnDelete()->after('id');
-            $table->unsignedInteger('booking_count')->default(0)->after('currency');
+            $table->foreignId('schedule_id')->nullable()->constrained()->cascadeOnDelete();
+            $table->unsignedInteger('booking_count')->default(0);
             $table->dropForeign(['booking_id']);
             $table->dropColumn('booking_id');
         });
