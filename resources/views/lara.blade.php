@@ -240,7 +240,7 @@ async function sendMessage() {
     showTyping();
 
     try {
-        const res = await fetch('{{ route("lara.message") }}', {
+        const res = await fetch('{{ route($messageRoute) }}', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': csrf },
             body: JSON.stringify({ message: text }),
@@ -261,7 +261,7 @@ async function sendMessage() {
 
 async function resetChat() {
     if (!confirm('Apagar conversa e começar de novo?')) return;
-    await fetch('{{ route("lara.reset") }}', {
+    await fetch('{{ route($resetRoute) }}', {
         method: 'POST',
         headers: { 'X-CSRF-TOKEN': csrf },
     });
@@ -283,7 +283,7 @@ window.addEventListener('load', async () => {
     showTyping();
     sendBtn.disabled = true;
     try {
-        const res = await fetch('{{ route("lara.message") }}', {
+        const res = await fetch('{{ route($messageRoute) }}', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': csrf },
             body: JSON.stringify({ message: '__init__' }),

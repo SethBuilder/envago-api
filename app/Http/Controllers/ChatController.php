@@ -17,7 +17,11 @@ class ChatController extends Controller
             ->orderBy('created_at')
             ->get(['role', 'message']);
 
-        return view('lara', ['history' => $history]);
+        return view('lara', [
+            'history'      => $history,
+            'messageRoute' => 'lara.message',
+            'resetRoute'   => 'lara.reset',
+        ]);
     }
 
     public function message(Request $request, LaraService $lara)
