@@ -1,6 +1,9 @@
 #!/bin/bash
 set -e
 
+# Load EB environment variables (not available in hooks by default)
+source /opt/elasticbeanstalk/deployment/env
+
 APP=/var/app/current
 
 mkdir -p "$APP/storage/framework/sessions" \
