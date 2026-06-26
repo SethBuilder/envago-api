@@ -100,4 +100,5 @@ class BookingController extends Controller
         $booking = Booking::where('reference', $reference)->firstOrFail();
         return response()->json(['status' => $booking->status]);
     }
+
 }
