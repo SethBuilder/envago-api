@@ -14,6 +14,12 @@ class Activity extends Model
 
     protected $casts = ['is_active' => 'boolean', 'price' => 'decimal:2'];
 
+    public function scopePublic($query)
+    {
+        return $query->where('is_active', true)
+                     ->whereHas('provider', fn($q) => $q->where('status', 'approved'));
+    }
+
     public function provider()
     {
         return $this->belongsTo(Provider::class);

@@ -9,7 +9,7 @@ class CategoryController extends Controller
 {
     public function index()
     {
-        $categories = Category::whereHas('activities', fn($q) => $q->where('is_active', true))
+        $categories = Category::whereHas('activities', fn($q) => $q->public())
             ->orderBy('name')
             ->get(['id', 'name', 'slug']);
 
