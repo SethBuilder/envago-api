@@ -35,7 +35,7 @@ class ActivityController extends Controller
                 'state'            => $a->state,
                 'category'         => $a->category?->only(['id', 'name', 'slug']),
                 'cover_url'        => $a->cover?->url,
-                'provider'         => $a->provider ? ['id' => $a->provider->id, 'business_name' => $a->provider->business_name, 'logo_url' => $a->provider->logo_url] : null,
+                'provider'         => $a->provider ? ['id' => $a->provider->id, 'business_name' => $a->provider->business_name, 'slug' => $a->provider->slug, 'logo_url' => $a->provider->logo_url] : null,
                 'avg_rating'       => $a->reviews->avg('rating') ? round($a->reviews->avg('rating'), 1) : null,
                 'review_count'     => $a->reviews->count(),
                 'recent_reviews'   => $a->reviews->take(4)->map(fn($r) => [
@@ -58,20 +58,23 @@ class ActivityController extends Controller
             ->where('is_active', true)
             ->firstOrFail();
 
-        $schedules = $activity->schedules()
-            ->where('date', '>=', Carbon::today())
-            ->where('date', '<=', Carbon::today()->addDays(14))
-            ->orderBy('date')
-            ->orderBy('time')
-            ->get()
-            ->map(fn($s) => [
-                'id'           => $s->id,
-                'date'         => $s->date->toDateString(),
-                'time'         => substr($s->time, 0, 5),
-                'seats_total'  => $s->seats_total,
-                'seats_booked' => $s->seats_booked,
-                'seats_left'   => $s->seats_total - $s->seats_booked,
-            ]);
+        // Only show schedules if provider is approved (Option A)
+        $schedules = $activity->provider?->status === 'approved'
+            ? $activity->schedules()
+                ->where('date', '>=', Carbon::today())
+                ->where('date', '<=', Carbon::today()->addDays(14))
+                ->orderBy('date')
+                ->orderBy('time')
+                ->get()
+                ->map(fn($s) => [
+                    'id'           => $s->id,
+                    'date'         => $s->date->toDateString(),
+                    'time'         => substr($s->time, 0, 5),
+                    'seats_total'  => $s->seats_total,
+                    'seats_booked' => $s->seats_booked,
+                    'seats_left'   => $s->seats_total - $s->seats_booked,
+                ])
+            : collect();
 
         return response()->json([
             'data' => [
@@ -85,7 +88,13 @@ class ActivityController extends Controller
                 'city'             => $activity->city,
                 'state'            => $activity->state,
                 'category'         => $activity->category?->only(['id', 'name', 'slug']),
-                'provider'         => $activity->provider ? ['id' => $activity->provider->id, 'business_name' => $activity->provider->business_name, 'logo_url' => $activity->provider->logo_url] : null,
+                'provider'         => $activity->provider ? [
+                    'id'              => $activity->provider->id,
+                    'business_name'   => $activity->provider->business_name,
+                    'slug'            => $activity->provider->slug,
+                    'logo_url'        => $activity->provider->logo_url,
+                    'booking_enabled' => $activity->provider->status === 'approved',
+                ] : null,
                 'cover_url'        => $activity->media->where('type', 'cover')->first()?->url,
                 'gallery'          => $activity->media->where('type', 'gallery')->map(fn($m) => $m->url)->values(),
                 'avg_rating'       => $activity->reviews->avg('rating') ? round($activity->reviews->avg('rating'), 1) : null,
