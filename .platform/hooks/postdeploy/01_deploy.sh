@@ -18,7 +18,6 @@ chmod 664 "$APP/storage/logs/laravel.log"
 
 cd "$APP"
 php artisan migrate --force
-php artisan db:seed --force
 php artisan storage:link --force
 php artisan config:cache
 php artisan route:cache
