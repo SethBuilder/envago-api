@@ -2,7 +2,9 @@
 set -e
 
 # Load EB environment variables (not available in hooks by default)
-source /opt/elasticbeanstalk/deployment/env
+for f in /opt/elasticbeanstalk/deployment/env /opt/elasticbeanstalk/support/envvars; do
+    [ -f "$f" ] && source "$f" && break
+done
 
 APP=/var/app/current
 
