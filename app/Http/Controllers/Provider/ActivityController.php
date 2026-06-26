@@ -37,7 +37,7 @@ class ActivityController extends Controller
             'groups.*.days.*'   => 'integer|between:0,6',
             'groups.*.times'    => 'required|array|min:1',
             'groups.*.times.*'  => 'date_format:H:i',
-            'photos'            => 'required|array|min:1',
+            'photos'            => 'required',
             'photos.*'          => 'image|mimes:jpeg,png,jpg,webp|max:5120',
         ], [
             'name.required'             => 'O nome do passeio é obrigatório.',
