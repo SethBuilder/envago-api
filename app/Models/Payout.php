@@ -6,17 +6,33 @@ use Illuminate\Database\Eloquent\Model;
 
 class Payout extends Model
 {
-    protected $fillable = ['provider_id', 'booking_id', 'amount', 'commission', 'status', 'paid_at'];
+    protected $fillable = [
+        'schedule_id', 'provider_id', 'amount', 'booking_count',
+        'currency', 'status', 'paid_at', 'confirmation_path', 'notes',
+    ];
 
-    protected $casts = ['paid_at' => 'datetime', 'amount' => 'decimal:2', 'commission' => 'decimal:2'];
+    protected $casts = [
+        'paid_at' => 'datetime',
+        'amount'  => 'decimal:2',
+    ];
+
+    public function schedule()
+    {
+        return $this->belongsTo(Schedule::class);
+    }
 
     public function provider()
     {
         return $this->belongsTo(Provider::class);
     }
 
-    public function booking()
+    public function bookings()
     {
-        return $this->belongsTo(Booking::class);
+        return $this->hasMany(Booking::class);
+    }
+
+    public function isPaid(): bool
+    {
+        return $this->status === 'paid';
     }
 }

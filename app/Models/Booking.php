@@ -8,8 +8,8 @@ class Booking extends Model
 {
     protected $fillable = [
         'user_id', 'schedule_id', 'seats', 'total_price',
-        'status', 'payment_ref', 'confirmed_at',
-        'guest_name', 'guest_email', 'guest_cpf', 'reference',
+        'status', 'cancellation_reason', 'payment_ref', 'confirmed_at',
+        'guest_name', 'guest_email', 'guest_cpf', 'reference', 'payout_id',
     ];
 
     protected $casts = ['confirmed_at' => 'datetime', 'total_price' => 'decimal:2'];
@@ -26,6 +26,6 @@ class Booking extends Model
 
     public function payout()
     {
-        return $this->hasOne(Payout::class);
+        return $this->belongsTo(Payout::class);
     }
 }

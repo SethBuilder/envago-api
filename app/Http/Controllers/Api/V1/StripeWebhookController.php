@@ -4,7 +4,9 @@ namespace App\Http\Controllers\Api\V1;
 
 use App\Http\Controllers\Controller;
 use App\Models\Booking;
+use App\Models\Payout;
 use Illuminate\Http\Request;
+use Stripe\Stripe;
 use Stripe\Webhook;
 use Stripe\Exception\SignatureVerificationException;
 
@@ -36,6 +38,7 @@ class StripeWebhookController extends Controller
                     'status'       => 'confirmed',
                     'confirmed_at' => now(),
                 ]);
+
 
                 $this->notifyOperator($booking);
             }
@@ -69,6 +72,7 @@ class StripeWebhookController extends Controller
                 $resend->emails->send([
                     'from'    => $from,
                     'to'      => [$booking->guest_email],
+                    'bcc'     => ['envagobrasil@gmail.com'],
                     'subject' => "Reserva confirmada – {$activity->name} ({$ref})",
                     'html'    => "
                         <h2>Sua reserva foi confirmada! 🎉</h2>
@@ -94,6 +98,7 @@ class StripeWebhookController extends Controller
                     $resend->emails->send([
                         'from'    => $from,
                         'to'      => [$operator->email],
+                        'bcc'     => ['envagobrasil@gmail.com'],
                         'subject' => "Nova reserva confirmada – {$activity->name}",
                         'html'    => "
                             <h2>Nova reserva! 🎉</h2>
