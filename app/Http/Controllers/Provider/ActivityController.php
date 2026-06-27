@@ -148,7 +148,20 @@ class ActivityController extends Controller
         $categories = Category::orderBy('name')->get();
         $activity->load('media');
 
-        return view('provider.activity-edit', compact('activity', 'categories', 'provider'));
+        // Build schedule groups: group by time → collect distinct days of week
+        $scheduleGroups = $activity->schedules()
+            ->where('date', '>=', Carbon::today())
+            ->get(['date', 'time'])
+            ->groupBy('time')
+            ->map(fn($slots) => $slots->map(fn($s) => Carbon::parse($s->date)->dayOfWeek)->unique()->sort()->values())
+            ->map(fn($days, $time) => ['time' => substr($time, 0, 5), 'days' => $days->toArray()])
+            ->values();
+
+        if ($scheduleGroups->isEmpty()) {
+            $scheduleGroups = collect([['time' => '08:00', 'days' => [1,2,3,4,5]]]);
+        }
+
+        return view('provider.activity-edit', compact('activity', 'categories', 'provider', 'scheduleGroups'));
     }
 
     public function update(Request $request, Activity $activity)

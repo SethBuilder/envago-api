@@ -328,7 +328,8 @@ const DAY_LABELS = [['D','Dom'],['S','Seg'],['T','Ter'],['Q','Qua'],['Q','Qui'],
 let groupSeq = 0;
 const groups = {};
 
-addGroup([1,2,3,4,5], ['08:00']);
+const existingGroups = @json($scheduleGroups);
+existingGroups.forEach(g => addGroup(g.days, [g.time]));
 
 function addGroup(defaultDays, defaultTimes) {
   const id = ++groupSeq;
