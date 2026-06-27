@@ -96,6 +96,7 @@ class LaraOnboardService
                         'city'             => $op['city'],
                         'state'            => $op['state'],
                         'description'      => $tour['description'] ?? null,
+                        'meeting_point'    => $tour['meeting_point'] ?? null,
                         'is_active'        => true,
                     ]
                 );

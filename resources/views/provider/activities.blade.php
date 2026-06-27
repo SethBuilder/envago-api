@@ -57,7 +57,9 @@
               <span class="badge badge-cancelled">Inativo</span>
             @endif
           </td>
-          <td>
+          <td style="display:flex;gap:6px;">
+            <a href="{{ route('provider.activities.edit', $activity) }}"
+               class="btn btn-ghost" style="font-size:12px;">Editar</a>
             <a href="{{ config('app.frontend_url') }}/passeio/{{ $activity->slug }}"
                target="_blank" class="btn btn-ghost" style="font-size:12px;">Ver página</a>
           </td>

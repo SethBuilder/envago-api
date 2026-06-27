@@ -172,6 +172,17 @@
         <span class="f-error" id="err-description"></span>
       </div>
 
+      <div class="f-group">
+        <label class="f-label">Ponto de encontro</label>
+        <input type="text" name="meeting_point" id="meeting-point-input" class="f-input"
+          placeholder="ex: Estacionamento da Duna do Pôr do Sol, Jericoacoara, CE"
+          autocomplete="off">
+        <input type="hidden" name="meeting_point_lat" id="meeting-point-lat">
+        <input type="hidden" name="meeting_point_lng" id="meeting-point-lng">
+        <span class="f-hint">Onde o turista deve se apresentar. <a id="meeting-point-map-link" href="#" target="_blank" rel="noopener" style="color:#111;font-weight:500;display:none;">Ver no mapa ↗</a></span>
+        <span class="f-error" id="err-meeting_point"></span>
+      </div>
+
     </div>
   </div>
 
@@ -227,7 +238,26 @@
 </form>
 
 @push('scripts')
+@if(config('services.google.places_key'))
+<script src="https://maps.googleapis.com/maps/api/js?key={{ config('services.google.places_key') }}&libraries=places&callback=initPlaces" async defer></script>
+@endif
 <script>
+// ── Google Places autocomplete ────────────────────────────────
+function initPlaces() {
+  const input = document.getElementById('meeting-point-input');
+  if (!input || !window.google) return;
+  const ac = new google.maps.places.Autocomplete(input, { types: ['establishment', 'geocode'], componentRestrictions: { country: 'br' } });
+  ac.addListener('place_changed', () => {
+    const place = ac.getPlace();
+    if (!place.geometry) return;
+    document.getElementById('meeting-point-lat').value = place.geometry.location.lat();
+    document.getElementById('meeting-point-lng').value = place.geometry.location.lng();
+    const link = document.getElementById('meeting-point-map-link');
+    link.href = `https://www.google.com/maps?q=${place.geometry.location.lat()},${place.geometry.location.lng()}`;
+    link.style.display = 'inline';
+  });
+}
+
 // ── Schedule groups ──────────────────────────────────────────
 const DAY_LABELS = [['D','Dom'],['S','Seg'],['T','Ter'],['Q','Qua'],['Q','Qui'],['S','Sex'],['S','Sáb']];
 let groupSeq = 0;

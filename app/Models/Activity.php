@@ -9,6 +9,7 @@ class Activity extends Model
     protected $fillable = [
         'provider_id', 'category_id', 'name', 'slug', 'description',
         'price', 'duration_minutes', 'capacity', 'city', 'state',
+        'meeting_point', 'meeting_point_lat', 'meeting_point_lng',
         'lat', 'lng', 'is_active',
     ];
 

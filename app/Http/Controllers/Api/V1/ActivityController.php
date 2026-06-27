@@ -61,7 +61,7 @@ class ActivityController extends Controller
         $schedules = $activity->provider?->status === 'approved'
             ? $activity->schedules()
                 ->where('date', '>=', Carbon::today())
-                ->where('date', '<=', Carbon::today()->addDays(14))
+                ->where('date', '<=', Carbon::today()->addDays(60))
                 ->orderBy('date')
                 ->orderBy('time')
                 ->get()
@@ -96,6 +96,9 @@ class ActivityController extends Controller
                 ] : null,
                 'cover_url'        => $activity->media->where('type', 'cover')->first()?->url,
                 'gallery'          => $activity->media->where('type', 'gallery')->map(fn($m) => $m->url)->values(),
+                'meeting_point'    => $activity->meeting_point,
+                'meeting_point_lat'=> $activity->meeting_point_lat,
+                'meeting_point_lng'=> $activity->meeting_point_lng,
                 'avg_rating'       => $activity->reviews->avg('rating') ? round($activity->reviews->avg('rating'), 1) : null,
                 'review_count'     => $activity->reviews->count(),
                 'reviews'          => $activity->reviews->map(fn($r) => [
