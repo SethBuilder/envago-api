@@ -14,8 +14,11 @@ chown -R webapp:webapp "$APP/storage" "$APP/bootstrap/cache"
 chmod -R 775 "$APP/storage" "$APP/bootstrap/cache"
 
 cd "$APP"
-su webapp -s /bin/bash -c "php artisan migrate --force"
-su webapp -s /bin/bash -c "php artisan storage:link --force"
-su webapp -s /bin/bash -c "php artisan config:cache"
-su webapp -s /bin/bash -c "php artisan route:cache"
-su webapp -s /bin/bash -c "php artisan view:cache"
+php artisan migrate --force
+php artisan storage:link --force
+php artisan config:cache
+php artisan route:cache
+php artisan view:cache
+
+# chown after artisan so cache files created by root are accessible to webapp
+chown -R webapp:webapp "$APP/storage" "$APP/bootstrap/cache"
