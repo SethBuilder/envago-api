@@ -4,28 +4,35 @@ namespace App\Http\Controllers\Api\V1;
 
 use App\Http\Controllers\Controller;
 use App\Models\Provider;
+use Illuminate\Http\Request;
 
 class ProviderController extends Controller
 {
-    public function show(string $slug)
+    public function show(string $slug, Request $request)
     {
-        $provider = Provider::with(['activities' => function ($q) {
+        $preview = $request->boolean('preview');
+
+        $query = Provider::with(['activities' => function ($q) {
                 $q->with(['cover', 'category', 'reviews'])
                   ->where('is_active', true)
                   ->orderBy('name');
             }])
-            ->where('slug', $slug)
-            ->where('status', 'approved')
-            ->firstOrFail();
+            ->where('slug', $slug);
+
+        if (!$preview) {
+            $query->where('status', 'approved');
+        }
+
+        $provider = $query->firstOrFail();
 
         return response()->json([
             'data' => [
-                'id'                         => $provider->id,
-                'business_name'              => $provider->business_name,
-                'slug'                       => $provider->slug,
-                'logo_url'                   => $provider->logo_url,
+                'id'              => $provider->id,
+                'business_name'   => $provider->business_name,
+                'slug'            => $provider->slug,
+                'logo_url'        => $provider->logo_url,
                 'booking_enabled' => $provider->status === 'approved',
-                'activities'                 => $provider->activities->map(fn($a) => [
+                'activities'      => $provider->activities->map(fn($a) => [
                     'id'               => $a->id,
                     'name'             => $a->name,
                     'slug'             => $a->slug,

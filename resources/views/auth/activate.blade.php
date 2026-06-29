@@ -13,8 +13,9 @@
   h1 { font-size: 20px; font-weight: 600; color: #111; margin-bottom: 6px; }
   .subtitle { font-size: 14px; color: #888; margin-bottom: 28px; }
   label { display: block; font-size: 13px; font-weight: 500; color: #444; margin-bottom: 6px; }
-  input[type=password] { width: 100%; padding: 11px 14px; border: 1.5px solid #e5e5e5; border-radius: 8px; font-size: 15px; font-family: inherit; outline: none; transition: border-color .15s; }
-  input:focus { border-color: #FF2924; }
+  input[type=email], input[type=password] { width: 100%; padding: 11px 14px; border: 1.5px solid #e5e5e5; border-radius: 8px; font-size: 15px; font-family: inherit; outline: none; transition: border-color .15s; }
+  input[type=password]:focus { border-color: #FF2924; }
+  input[readonly] { background: #f9f7f4; color: #999; cursor: default; }
   .field { margin-bottom: 18px; }
   .error { font-size: 12px; color: #FF2924; margin-top: 5px; }
   .btn { width: 100%; padding: 12px; background: #111; color: #fff; border: none; border-radius: 8px; font-size: 15px; font-weight: 600; cursor: pointer; transition: background .15s; }
@@ -29,6 +30,10 @@
 
   <form method="POST" action="{{ route('auth.activate.submit', $token) }}">
     @csrf
+    <div class="field">
+      <label for="email">E-mail</label>
+      <input type="email" id="email" name="email" value="{{ $email }}" readonly autocomplete="username" tabindex="-1">
+    </div>
     <div class="field">
       <label for="password">Nova senha</label>
       <input type="password" id="password" name="password" autocomplete="new-password" autofocus required minlength="8">

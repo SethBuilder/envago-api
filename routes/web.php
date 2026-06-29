@@ -3,6 +3,7 @@
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\ChatController;
+use App\Http\Controllers\ParceirosController;
 use App\Http\Controllers\Admin\DashboardController as AdminDashboard;
 use App\Http\Controllers\Admin\PayoutController as AdminPayout;
 use App\Http\Controllers\Admin\ProviderController as AdminProvider;
@@ -42,6 +43,10 @@ Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(fun
     Route::post('/payouts/{schedule}/pay',              [AdminPayout::class, 'pay'])->name('payouts.pay');
     Route::get('/payouts/{payout}/download',            [AdminPayout::class, 'download'])->name('payouts.download');
 });
+
+// Parceiros — public provider onboarding chat
+Route::get('/parceiros',          [ParceirosController::class, 'show'])->name('parceiros');
+Route::post('/parceiros/message', [ParceirosController::class, 'message'])->name('parceiros.message');
 
 // Lara test — admin only, at /lara
 Route::middleware(['auth', 'admin'])->group(function () {

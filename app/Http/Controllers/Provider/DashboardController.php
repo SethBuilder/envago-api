@@ -7,6 +7,7 @@ use App\Mail\BookingCancelledMail;
 use App\Models\Booking;
 use App\Models\Payout;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Storage;
@@ -45,7 +46,19 @@ class DashboardController extends Controller
                 );
         }
 
-        return view('provider.dashboard', compact('provider', 'stats', 'grouped'));
+        // Show Lara welcome banner on first dashboard visit after Lara onboarding
+        $laraWelcome = false;
+        if ($provider) {
+            $sessionKey = 'lara_welcomed_' . $provider->id;
+            if (!session()->has($sessionKey)) {
+                $laraWelcome = DB::table('lara_conversations')
+                    ->where('provider_id', $provider->id)
+                    ->exists();
+                session()->put($sessionKey, true);
+            }
+        }
+
+        return view('provider.dashboard', compact('provider', 'stats', 'grouped', 'laraWelcome'));
     }
 
     public function bookings()

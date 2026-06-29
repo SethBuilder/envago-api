@@ -91,7 +91,7 @@ class AuthController extends Controller
             ->where('activation_token_expires_at', '>', now())
             ->firstOrFail();
 
-        return view('auth.activate', ['token' => $token]);
+        return view('auth.activate', ['token' => $token, 'email' => $user->email]);
     }
 
     public function activate(Request $request, string $token)
