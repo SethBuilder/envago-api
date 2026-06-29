@@ -124,6 +124,11 @@ PROMPT;
         ],
     ];
 
+    private function parceirosOpening(): string
+    {
+        return "Olá. Bem-vindo ao Envago — a plataforma onde turistas encontram e reservam passeios no Brasil. Criamos sua página gratuitamente e cuidamos dos anúncios no Google e Instagram para trazer os turistas até você. Para começar, me manda a lista de passeios que você oferece com os preços. Pode ser planilha, foto, PDF ou digita aqui mesmo.";
+    }
+
     private function websiteOpening(): string
     {
         $hour = (int) now('America/Fortaleza')->format('H');
@@ -150,6 +155,10 @@ PROMPT;
 
         if ($context === 'website' && empty($history) && $userMessage === 'Olá') {
             return $this->websiteOpening();
+        }
+
+        if ($context === 'parceiros' && empty($history) && $userMessage === '__init__') {
+            return $this->parceirosOpening();
         }
 
         if ($fileBlocks) {

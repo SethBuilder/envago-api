@@ -77,9 +77,7 @@ class ParceirosController extends Controller
 
         $userMessage = trim($uploadedMsg . $userMessage);
 
-        $triggerMessage = $isInit
-            ? '[SYSTEM: This is the very first message. Start immediately with the onboarding opening from step 1 of your flow. Do not say "Como posso ajudá-lo" or any generic greeting.]'
-            : ($userMessage ?: 'Olá');
+        $triggerMessage = $isInit ? '__init__' : ($userMessage ?: 'Olá');
 
         $rawReply = $lara->respond(
             $history->all(),
