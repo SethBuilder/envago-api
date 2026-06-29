@@ -104,6 +104,14 @@ PROMPT;
             'messages'   => [['role' => 'user', 'content' => $summary]],
         ]);
 
+        if (!$response->successful()) {
+            Log::error('lara: anthropic api error (json generator)', [
+                'status' => $response->status(),
+                'body'   => substr($response->body(), 0, 500),
+            ]);
+            return '';
+        }
+
         return collect($response->json('content'))->firstWhere('type', 'text')['text'] ?? '';
     }
 
@@ -193,6 +201,15 @@ PROMPT;
                 'anthropic-version' => '2023-06-01',
                 'content-type'      => 'application/json',
             ])->post('https://api.anthropic.com/v1/messages', $payload);
+
+            if (!$response->successful()) {
+                Log::error('lara: anthropic api error', [
+                    'status' => $response->status(),
+                    'body'   => substr($response->body(), 0, 500),
+                    'model'  => $payload['model'],
+                ]);
+                return '';
+            }
 
             $content   = $response->json('content') ?? [];
             $stopReason = $response->json('stop_reason');
