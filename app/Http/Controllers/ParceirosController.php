@@ -6,6 +6,7 @@ use App\Services\LaraService;
 use App\Services\OnboardingService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use PhpOffice\PhpSpreadsheet\IOFactory;
@@ -81,7 +82,8 @@ class ParceirosController extends Controller
             $triggerMessage,
             'parceiros',
             null,
-            empty($fileBlocks) ? null : $fileBlocks
+            empty($fileBlocks) ? null : $fileBlocks,
+            $this->makeFetchUrlExecutor($sessionId)
         );
 
         // Intercept onboard JSON
@@ -124,6 +126,59 @@ class ParceirosController extends Controller
         DB::table('lara_conversations')->insert($rows);
 
         return response()->json(['reply' => $cleanReply]);
+    }
+
+    private function makeFetchUrlExecutor(string $sessionId): callable
+    {
+        return function (string $name, array $input) use ($sessionId): mixed {
+            if ($name !== 'fetch_url') return 'Unknown tool.';
+
+            $url = $input['url'] ?? '';
+            if (!filter_var($url, FILTER_VALIDATE_URL)) {
+                return 'Invalid URL.';
+            }
+
+            try {
+                $response = Http::timeout(10)->get($url);
+                if (!$response->successful()) {
+                    return "Could not fetch URL (HTTP {$response->status()}).";
+                }
+
+                $contentType = strtolower($response->header('Content-Type') ?? '');
+                $mime        = explode(';', $contentType)[0];
+                $body        = $response->body();
+
+                if (str_starts_with($mime, 'image/')) {
+                    $filename = basename(parse_url($url, PHP_URL_PATH)) ?: uniqid('img_') . '.jpg';
+                    $this->saveTempPhotoContent($sessionId, $filename, $body);
+                    return [
+                        ['type' => 'text', 'text' => "Image fetched. Filename for reference: {$filename}"],
+                        ['type' => 'image', 'source' => ['type' => 'base64', 'media_type' => $mime ?: 'image/jpeg', 'data' => base64_encode($body)]],
+                    ];
+                }
+
+                if (str_contains($mime, 'pdf')) {
+                    return [
+                        ['type' => 'text',     'text' => "PDF fetched from {$url}"],
+                        ['type' => 'document', 'source' => ['type' => 'base64', 'media_type' => 'application/pdf', 'data' => base64_encode($body)]],
+                    ];
+                }
+
+                // HTML or plain text — strip tags, truncate
+                $text = strip_tags($body);
+                $text = preg_replace('/\s+/', ' ', trim($text));
+                return substr($text, 0, 4000);
+            } catch (\Throwable $e) {
+                Log::warning('parceiros: fetch_url failed', ['url' => $url, 'error' => $e->getMessage()]);
+                return "Could not fetch URL: {$e->getMessage()}";
+            }
+        };
+    }
+
+    private function saveTempPhotoContent(string $sessionId, string $filename, string $content): void
+    {
+        $dest = "temp/{$sessionId}/" . basename($filename);
+        Storage::put($dest, $content);
     }
 
     private function saveTempPhoto(string $sessionId, string $filename, string $realPath): void
