@@ -63,6 +63,8 @@ class ParceirosController extends Controller
                     // Save to temp storage so OnboardingService can link to activities later
                     $this->saveTempPhoto($sessionId, $filename, $file->getRealPath());
 
+                    // Tell Lara the exact filename so she can reference it in the photos array
+                    $fileBlocks[] = ['type' => 'text', 'text' => "Photo uploaded. Filename: {$filename}. Use this exact filename in the photos array for the tour this image belongs to."];
                     $fileBlocks[] = [
                         'type'   => 'image',
                         'source' => ['type' => 'base64', 'media_type' => $mime, 'data' => base64_encode(file_get_contents($file->getRealPath()))],
