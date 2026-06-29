@@ -98,6 +98,7 @@ class ParceirosController extends Controller
 
         if ($confirmedData) {
             try {
+                $confirmedData['temp_files'] = $this->listTempFiles($sessionId);
                 $jsonStr     = $lara->generateOnboardJson($confirmedData);
                 Log::info('parceiros.generated_json', ['session' => $sessionId, 'json' => substr($jsonStr, 0, 500)]);
                 $onboardData = $this->extractOnboardJson($jsonStr);
@@ -191,6 +192,12 @@ class ParceirosController extends Controller
                 return "Could not fetch URL: {$e->getMessage()}";
             }
         };
+    }
+
+    private function listTempFiles(string $sessionId): array
+    {
+        $files = Storage::files("temp/{$sessionId}");
+        return array_map(fn($f) => basename($f), $files);
     }
 
     private function saveTempPhotoContent(string $sessionId, string $filename, string $content): void

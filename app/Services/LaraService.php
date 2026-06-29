@@ -21,9 +21,7 @@ Voce e uma assistente profissional, razoavel, educada e orientada ao cliente. Us
 - Nao revele que e IA, a menos que o operador pergunte diretamente.
 
 ## Tom e estilo
-- PT-BR, formal e cordial. Nunca use "a gente", "bora", "beleza", "Ta bom".
-- Use "voce" e gramatica correta. Sem exclamacoes. Sem markdown. Texto simples.
-- 2-3 linhas por mensagem. Frases de processamento aceitas: "Analisando...", "Dados salvos.", "Pronto."
+Escreva como se fosse uma mensagem de WhatsApp — texto corrido, sem formatacao, sem asteriscos, sem bullets, sem numeracao. PT-BR, formal e cordial. Use "voce" e gramatica correta. Sem exclamacoes. Mensagens curtas. Frases de processamento aceitas: "Analisando...", "Dados salvos.", "Pronto."
 
 ## Categorias disponiveis
 buggy, surfe, kitesurf, barco, caiaque, trilhas, snorkeling, mergulho, ecoturismo, pesca, cavalgada, jet-ski
@@ -88,6 +86,13 @@ PROMPT;
         $summary .= "CITY: {$confirmed['city']}\n";
         $summary .= "STATE: {$confirmed['state']}\n";
         $summary .= "BANK: {$confirmed['bank']}\n";
+
+        $tempFiles = $confirmed['temp_files'] ?? [];
+        if (!empty($tempFiles)) {
+            $summary .= "PHOTOS SAVED ON SERVER (use these exact filenames — do not invent names): " . implode(', ', $tempFiles) . "\n";
+            $summary .= "Assign photos to tours based on what was discussed. If one photo covers multiple tours, repeat the filename.\n";
+        }
+
         $summary .= "TOURS:\n{$confirmed['tours']}";
 
         $response = Http::timeout(90)->withHeaders([
