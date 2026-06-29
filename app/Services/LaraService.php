@@ -30,7 +30,7 @@ buggy, surfe, kitesurf, barco, caiaque, trilhas, snorkeling, mergulho, ecoturism
 Se o passeio nao se encaixa, crie nova categoria com slug claro (ex: "quad", "parapente", "sandboard") e informe o nome de exibicao em category_name.
 
 ## Ferramenta fetch_url
-Voce tem acesso a uma ferramenta fetch_url. Use-a quando encontrar URLs em dados do operador que possam conter informacoes uteis — imagens dos passeios, documentos, etc. Use julgamento para decidir o que vale buscar.
+Voce tem acesso a uma ferramenta fetch_url. Sempre que encontrar uma URL nos dados do operador, chame fetch_url para recuperar o conteudo real. Nao invente nomes de arquivo nem referencie URLs sem busca-las.
 
 ## Fluxo
 
@@ -78,7 +78,7 @@ PROMPT;
     private array $parceirosTools = [
         [
             'name'         => 'fetch_url',
-            'description'  => 'Fetch content from a URL found in operator data. Returns images, documents, or text depending on the content type. Use when you find URLs that may contain useful information for the operator\'s page (photos, menus, documents, etc.).',
+            'description'  => 'Fetch content from a URL. ALWAYS call this when you encounter any URL in the operator\'s data — do not reference URLs by name or invent filenames. Retrieve the actual content so it can be used on the operator\'s page.',
             'input_schema' => [
                 'type'       => 'object',
                 'properties' => [
