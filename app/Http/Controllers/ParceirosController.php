@@ -88,10 +88,23 @@ class ParceirosController extends Controller
             $this->makeFetchUrlExecutor($sessionId)
         );
 
-        // Intercept onboard JSON
+        // Intercept confirmed/onboard JSON
         Log::info('parceiros.raw_reply', ['session' => $sessionId, 'reply' => substr($rawReply, 0, 500)]);
-        $cleanReply  = $rawReply;
-        $onboardData = $this->extractOnboardJson($rawReply);
+        $cleanReply    = $rawReply;
+        $confirmedData = $this->extractConfirmedJson($rawReply);
+        $onboardData   = $confirmedData ? null : $this->extractOnboardJson($rawReply);
+
+        if ($confirmedData) {
+            try {
+                $jsonStr     = $lara->generateOnboardJson($confirmedData);
+                Log::info('parceiros.generated_json', ['session' => $sessionId, 'json' => substr($jsonStr, 0, 500)]);
+                $onboardData = $this->extractOnboardJson($jsonStr);
+                if (!$onboardData) throw new \RuntimeException("JSON generator returned invalid JSON: " . substr($jsonStr, 0, 200));
+            } catch (\Throwable $e) {
+                Log::error('parceiros.json_generation failed', ['error' => $e->getMessage()]);
+                $cleanReply = 'Ocorreu um erro ao finalizar o cadastro. Nossa equipe foi notificada — tente novamente.';
+            }
+        }
 
         if ($onboardData) {
             try {
@@ -102,7 +115,7 @@ class ParceirosController extends Controller
                 Log::error('parceiros.onboard failed', ['error' => $e->getMessage()]);
                 $cleanReply = 'Ocorreu um erro ao criar sua página. Nossa equipe foi notificada — tente novamente em alguns minutos.';
             }
-        } elseif (str_contains($rawReply, '"action":')) {
+        } elseif (!$confirmedData && str_contains($rawReply, '"action":')) {
             Log::warning('parceiros: JSON detected but unparseable', ['reply' => substr($rawReply, 0, 300)]);
             $cleanReply = 'Estou finalizando o cadastro. Pode levar alguns segundos — tente novamente em instantes.';
         }
@@ -224,6 +237,23 @@ class ParceirosController extends Controller
             Log::warning('parceiros: spreadsheet parse failed', ['error' => $e->getMessage()]);
             return '[Não foi possível ler o arquivo. Solicite ao operador que cole os dados manualmente.]';
         }
+    }
+
+    private function extractConfirmedJson(string $reply): ?array
+    {
+        $stripped = preg_replace('/```json\s*|\s*```/', '', $reply);
+        $pos      = strpos($stripped, '{"action":"confirmed"');
+        if ($pos === false) return null;
+
+        $candidate = substr($stripped, $pos);
+        for ($i = strlen($candidate); $i > 0; $i--) {
+            if ($candidate[$i - 1] !== '}') continue;
+            $data = json_decode(substr($candidate, 0, $i), true);
+            if (is_array($data) && ($data['action'] ?? '') === 'confirmed') {
+                return $data;
+            }
+        }
+        return null;
     }
 
     private function extractOnboardJson(string $reply): ?array

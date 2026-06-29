@@ -52,21 +52,20 @@ Registre internamente o nome exato de cada arquivo recebido para cada passeio.
 "Para receber os repasses, preciso dos seus dados bancarios. Pode preencher agora ou depois pelo painel em envago.live."
 Se quiser agora: nome completo do titular, CPF ou CNPJ, nome do banco, SWIFT/BIC, agencia, numero da conta e tipo (corrente ou poupanca), endereco com CEP.
 
-**6. Saida JSON — CRITICO**
+**6. Confirmacao final — CRITICO**
 Apos dados bancarios OU operador escolher preencher depois:
 Output APENAS o JSON abaixo, em uma unica linha continua.
 NENHUM texto antes. NENHUM texto depois. Sem markdown. Sem explicacao.
-O sistema intercepta este JSON e envia a resposta ao operador automaticamente.
+O sistema intercepta este JSON, gera a pagina e envia a resposta ao operador automaticamente.
 
-{"action":"onboard","operator":{"business_name":"string","email":"string","whatsapp":"string or empty string","city":"string","state":"2-letter BR UF","bank":{"beneficiary":"string","cpf_cnpj":"string","bank_name":"string","swift":"string","branch":"string","account":"string","account_type":"corrente or poupanca","address":"string","city":"string","state":"string","postcode":"string"}},"tours":[{"name":"string","category_slug":"string","category_name":"string","price":0,"duration_minutes":0,"capacity":0,"schedules":[{"days":[1,2,3,4,5],"times":["08:00"]}],"description":"string or null","meeting_point":"string or null","photos":["filename.jpg"]}]}
+{"action":"confirmed","business_name":"string","email":"string","whatsapp":"string or empty","city":"string","state":"2-letter UF","bank":"pendente or dados bancarios completos em texto","tours":"nome|categoria|preco|duracao_min|capacidade|dias(0-6 separados por virgula)|horarios(separados por virgula)|ponto_encontro|fotos(filenames separados por virgula) — uma linha por passeio separadas por ponto-e-virgula"}
 
-Regras tecnicas do JSON (nao sao julgamento — sao restricoes do sistema):
-- Omita "bank" se o operador escolheu preencher depois.
-- city e state nao podem ser vazios — pergunte antes de emitir se ainda nao coletou.
-- "schedules": dias como inteiros (0=domingo, 1=segunda, ..., 6=sabado).
-- "capacity": max de pessoas por horario.
-- "photos": nomes exatos dos arquivos recebidos para este passeio. Array vazio se nenhum.
-- "business_name": use exatamente o nome que o operador informou, nao o nome da planilha ou de um passeio.
+Regras (restricoes do sistema):
+- city e state nao podem ser vazios.
+- "business_name": use exatamente o nome que o operador informou.
+- dias: 0=domingo,1=segunda,...,6=sabado.
+- fotos: nomes exatos dos arquivos recebidos. Vazio se nenhum.
+- bank: "pendente" se operador escolheu preencher depois.
 
 ## Escalonamento
 Se houver disputa, payout em falta, suspensao ou situacao que exige julgamento humano:
@@ -74,6 +73,44 @@ Se houver disputa, payout em falta, suspensao ou situacao que exige julgamento h
 2. Na linha seguinte, output APENAS:
 {"action":"escalate","summary":"[1-2 sentence summary in English]"}
 PROMPT;
+
+    private string $jsonGeneratorPrompt = <<<'PROMPT'
+You are a JSON formatter for Envago. Convert the confirmed operator data below into the exact JSON schema. Output ONLY valid JSON on a single line. No text before or after. No markdown.
+
+Schema:
+{"action":"onboard","operator":{"business_name":"","email":"","whatsapp":"","city":"","state":"","bank":{"beneficiary":"","cpf_cnpj":"","bank_name":"","swift":"","branch":"","account":"","account_type":"corrente or poupanca","address":"","city":"","state":"","postcode":""}},"tours":[{"name":"","category_slug":"","category_name":"","price":0,"duration_minutes":0,"capacity":0,"schedules":[{"days":[1,2,3,4,5],"times":["08:00"]}],"description":null,"meeting_point":null,"photos":[]}]}
+
+Rules:
+- Omit "bank" object if bank value is "pendente".
+- days: integers 0=Sunday,1=Monday,...,6=Saturday.
+- category_slug: lowercase slug. category_name: display name in Portuguese.
+- photos: array of filenames. Empty array if none.
+- Output one single JSON line. No extra whitespace.
+PROMPT;
+
+    public function generateOnboardJson(array $confirmed): string
+    {
+        $summary  = "OPERATOR: {$confirmed['business_name']}\n";
+        $summary .= "EMAIL: {$confirmed['email']}\n";
+        $summary .= "WHATSAPP: {$confirmed['whatsapp']}\n";
+        $summary .= "CITY: {$confirmed['city']}\n";
+        $summary .= "STATE: {$confirmed['state']}\n";
+        $summary .= "BANK: {$confirmed['bank']}\n";
+        $summary .= "TOURS:\n{$confirmed['tours']}";
+
+        $response = Http::timeout(90)->withHeaders([
+            'x-api-key'         => env('ANTHROPIC_API_KEY'),
+            'anthropic-version' => '2023-06-01',
+            'content-type'      => 'application/json',
+        ])->post('https://api.anthropic.com/v1/messages', [
+            'model'      => 'claude-haiku-4-5-20251001',
+            'max_tokens' => 8096,
+            'system'     => $this->jsonGeneratorPrompt,
+            'messages'   => [['role' => 'user', 'content' => $summary]],
+        ]);
+
+        return collect($response->json('content'))->firstWhere('type', 'text')['text'] ?? '';
+    }
 
     private array $parceirosTools = [
         [
