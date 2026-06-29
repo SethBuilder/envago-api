@@ -177,6 +177,12 @@ PROMPT;
 
         $messages[] = ['role' => 'user', 'content' => $userContent];
 
+        // Anthropic requires the first message to have role 'user'.
+        // The init flow saves only the assistant opening row, so history may start with 'assistant'.
+        while (!empty($messages) && $messages[0]['role'] === 'assistant') {
+            array_shift($messages);
+        }
+
         $systemPrompt = $this->systemPrompt;
         if ($providerInfo) {
             $systemPrompt = "## Logged-in Provider Context\nYou are speaking with an already registered operator in their private dashboard. Do NOT pitch Envago or ask them to sign up. Help them with their existing account.\n\n{$providerInfo}\n\n" . $systemPrompt;

@@ -20,7 +20,7 @@ return [
     |
     */
 
-    'default' => env('LOG_CHANNEL', 'stack'),
+    'default' => env('LOG_CHANNEL', 'stack'), // stack = cloudwatch + single (ignore_exceptions: true)
 
     /*
     |--------------------------------------------------------------------------
@@ -56,8 +56,8 @@ return [
 
         'stack' => [
             'driver' => 'stack',
-            'channels' => explode(',', (string) env('LOG_STACK', 'single')),
-            'ignore_exceptions' => false,
+            'channels' => explode(',', (string) env('LOG_STACK', 'cloudwatch,single')),
+            'ignore_exceptions' => true,
         ],
 
         'single' => [
