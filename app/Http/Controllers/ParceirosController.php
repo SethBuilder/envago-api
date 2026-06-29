@@ -87,6 +87,7 @@ class ParceirosController extends Controller
         );
 
         // Intercept onboard JSON
+        Log::info('parceiros.raw_reply', ['session' => $sessionId, 'reply' => substr($rawReply, 0, 500)]);
         $cleanReply  = $rawReply;
         $onboardData = $this->extractOnboardJson($rawReply);
 
