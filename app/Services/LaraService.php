@@ -212,8 +212,17 @@ PROMPT;
                 return '';
             }
 
-            $content   = $response->json('content') ?? [];
+            $content    = $response->json('content') ?? [];
             $stopReason = $response->json('stop_reason');
+
+            if (empty($content)) {
+                Log::warning('lara: empty content from anthropic', [
+                    'status'      => $response->status(),
+                    'stop_reason' => $stopReason,
+                    'body'        => substr($response->body(), 0, 300),
+                ]);
+                return '';
+            }
 
             // No tool calls — return text response
             if ($stopReason !== 'tool_use') {
