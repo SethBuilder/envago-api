@@ -402,13 +402,18 @@ function now() {
 }
 
 // ── Append message bubble ─────────────────────────────────
+function linkify(text) {
+    const escaped = text.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    return escaped.replace(/(https?:\/\/[^\s]+)/g, '<a href="$1" target="_blank" rel="noopener" style="color:inherit;text-decoration:underline;word-break:break-all;">$1</a>');
+}
+
 function appendBubble(role, text) {
     const wrap = document.createElement('div');
     wrap.className = 'bubble-wrap ' + role;
 
     const bub = document.createElement('div');
     bub.className = 'bubble ' + role;
-    bub.textContent = text;
+    bub.innerHTML = linkify(text);
 
     const time = document.createElement('div');
     time.className = 'bubble-time';
