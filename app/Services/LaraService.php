@@ -146,7 +146,7 @@ PROMPT;
                 $payload['tools'] = $this->parceirosTools;
             }
 
-            $response = Http::withHeaders([
+            $response = Http::timeout(90)->withHeaders([
                 'x-api-key'         => env('ANTHROPIC_API_KEY'),
                 'anthropic-version' => '2023-06-01',
                 'content-type'      => 'application/json',

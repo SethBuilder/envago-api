@@ -26,6 +26,8 @@ class ParceirosController extends Controller
             'files.*'    => 'nullable|file|max:20480',
         ]);
 
+        set_time_limit(120);
+
         $sessionId   = $request->input('session_id');
         $userMessage = $request->input('message', '');
         $isInit      = $userMessage === '__init__';
