@@ -8,18 +8,19 @@
 deploy-*.zip
 build_deploy.py
 
-# Storage (created by postdeploy hook)
+# Storage — exclude generated files, keep .gitignore files so directories are created on deploy
 /storage/logs/*
 /storage/framework/cache/*
 /storage/framework/sessions/*
 /storage/framework/views/*
-!/storage/framework/cache/.gitkeep
-!/storage/framework/sessions/.gitkeep
-!/storage/framework/views/.gitkeep
+!/storage/framework/cache/.gitignore
+!/storage/framework/cache/data/.gitignore
+!/storage/framework/sessions/.gitignore
+!/storage/framework/views/.gitignore
 
 # Bootstrap cache (generated on server)
 /bootstrap/cache/*.php
-!/bootstrap/cache/.gitkeep
+!/bootstrap/cache/.gitignore
 
 # Dev tools
 /.cursor/
