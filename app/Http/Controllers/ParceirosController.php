@@ -2,18 +2,13 @@
 
 namespace App\Http\Controllers;
 
-use App\Mail\AccountActivationMail;
-use App\Models\Activity;
-use App\Models\Category;
-use App\Models\Provider;
-use App\Models\User;
 use App\Services\LaraService;
+use App\Services\OnboardingService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Facades\Mail;
-use Illuminate\Support\Str;
+use Illuminate\Support\Facades\Storage;
 use PhpOffice\PhpSpreadsheet\IOFactory;
 
 class ParceirosController extends Controller
@@ -23,13 +18,15 @@ class ParceirosController extends Controller
         return view('parceiros');
     }
 
-    public function message(Request $request, LaraService $lara)
+    public function message(Request $request, LaraService $lara, OnboardingService $onboarding)
     {
         $request->validate([
             'session_id' => 'required|string|max:100',
             'message'    => 'nullable|string|max:4000',
-            'file'       => 'nullable|file|max:20480',
+            'files.*'    => 'nullable|file|max:20480',
         ]);
+
+        set_time_limit(120);
 
         $sessionId   = $request->input('session_id');
         $userMessage = $request->input('message', '');
@@ -40,55 +37,104 @@ class ParceirosController extends Controller
             ->orderBy('created_at')
             ->get();
 
-        $fileBlocks = null;
-        if ($request->hasFile('file')) {
-            $file     = $request->file('file');
-            $filename = $file->getClientOriginalName();
-            $ext      = strtolower($file->getClientOriginalExtension());
-            $mime     = $file->getMimeType();
+        // Process uploaded files — images go to temp storage + multimodal blocks; docs extracted as text
+        $fileBlocks  = [];
+        $uploadedMsg = '';
 
-            if (in_array($ext, ['xlsx', 'xls', 'csv', 'ods'])) {
-                $text        = $this->extractSpreadsheet($file->getRealPath(), $ext);
-                $userMessage = trim("[Planilha: {$filename}]\n{$text}\n{$userMessage}");
-            } elseif ($ext === 'docx') {
-                $text        = $this->extractDocx($file->getRealPath());
-                $userMessage = trim("[Documento: {$filename}]\n{$text}\n{$userMessage}");
-            } elseif ($ext === 'pdf') {
-                $fileBlocks  = [[
-                    'type'   => 'document',
-                    'source' => ['type' => 'base64', 'media_type' => 'application/pdf', 'data' => base64_encode(file_get_contents($file->getRealPath()))],
-                    'title'  => $filename,
-                ]];
-                $userMessage = $userMessage ?: 'Analise este PDF e extraia informações sobre os passeios.';
-            } elseif (str_starts_with($mime ?? '', 'image/')) {
-                $fileBlocks  = [[
-                    'type'   => 'image',
-                    'source' => ['type' => 'base64', 'media_type' => $mime, 'data' => base64_encode(file_get_contents($file->getRealPath()))],
-                ]];
-                $userMessage = $userMessage ?: 'Analise esta imagem e extraia informações sobre os passeios.';
-            } else {
-                $userMessage = trim("[Arquivo enviado: {$filename}]\n{$userMessage}");
+        // Extract photo context from last assistant message (Lara's [PHOTO_FOR:slug] tag)
+        $photoContext = $this->getPhotoContext($history);
+
+        if ($request->hasFile('files')) {
+            foreach ($request->file('files') as $file) {
+                $filename = $file->getClientOriginalName();
+                $ext      = strtolower($file->getClientOriginalExtension());
+                $mime     = $file->getMimeType();
+
+                if (in_array($ext, ['xlsx', 'xls', 'csv', 'ods'])) {
+                    $text         = $this->extractSpreadsheet($file->getRealPath(), $ext);
+                    $uploadedMsg .= "[Planilha: {$filename}]\n{$text}\n";
+                } elseif ($ext === 'docx') {
+                    $text         = $this->extractDocx($file->getRealPath());
+                    $uploadedMsg .= "[Documento: {$filename}]\n{$text}\n";
+                } elseif ($ext === 'pdf') {
+                    $fileBlocks[] = [
+                        'type'   => 'document',
+                        'source' => ['type' => 'base64', 'media_type' => 'application/pdf', 'data' => base64_encode(file_get_contents($file->getRealPath()))],
+                        'title'  => $filename,
+                    ];
+                } elseif (str_starts_with($mime ?? '', 'image/')) {
+                    // Save to temp storage with slug prefix if photo context is known
+                    $savedName = $photoContext ? "{$photoContext}__{$filename}" : $filename;
+                    $this->saveTempPhoto($sessionId, $savedName, $file->getRealPath());
+
+                    $fileBlocks[] = [
+                        'type'   => 'image',
+                        'source' => ['type' => 'base64', 'media_type' => $mime, 'data' => base64_encode(file_get_contents($file->getRealPath()))],
+                    ];
+                } else {
+                    $uploadedMsg .= "[Arquivo: {$filename}]\n";
+                }
             }
         }
 
-        $triggerMessage = $isInit
-            ? '[SYSTEM: This is the very first message. Start immediately with the onboarding opening from step 1 of your flow. Do not say "Como posso ajudá-lo" or any generic greeting.]'
-            : $userMessage;
-        $rawReply = $lara->respond($history->all(), $triggerMessage, 'parceiros', null, $fileBlocks);
+        $userMessage = trim($uploadedMsg . $userMessage);
 
-        // Intercept onboard JSON — must happen before saving to DB
-        $cleanReply = $rawReply;
-        $onboardData = $this->extractOnboardJson($rawReply);
+        $triggerMessage = $isInit ? '__init__' : ($userMessage ?: 'Olá');
+
+        $rawReply = $lara->respond(
+            $history->all(),
+            $triggerMessage,
+            'parceiros',
+            null,
+            empty($fileBlocks) ? null : $fileBlocks,
+            $this->makeFetchUrlExecutor($sessionId)
+        );
+
+        // Intercept confirmed/onboard JSON
+        $cleanReply    = preg_replace('/\s*\[PHOTO_FOR:[^\]]+\]/', '', $rawReply);
+        $confirmedData = $this->extractConfirmedJson($rawReply);
+        $onboardData   = $confirmedData ? null : $this->extractOnboardJson($rawReply);
+
+        if ($confirmedData) {
+            try {
+                $jsonStr     = $lara->generateOnboardJson($confirmedData);
+                $onboardData = $this->extractOnboardJson($jsonStr);
+                if (!$onboardData) throw new \RuntimeException("JSON generator returned invalid JSON: " . substr($jsonStr, 0, 200));
+            } catch (\Throwable $e) {
+                Log::error('parceiros.json_generation failed', ['error' => $e->getMessage()]);
+                $cleanReply = 'Ocorreu um erro ao finalizar o cadastro. Nossa equipe foi notificada — tente novamente.';
+            }
+        }
+
+        // Post-process: assign temp photos to tours by slug prefix — no LLM involved
+        if ($onboardData) {
+            $tempFileMap = $this->listTempFiles($sessionId);
+            foreach ($onboardData['tours'] as &$tour) {
+                $slug = \Illuminate\Support\Str::slug($tour['name']);
+                if (isset($tempFileMap[$slug])) {
+                    $tour['photos'] = $tempFileMap[$slug];
+                } elseif (isset($tempFileMap['__unassigned'])) {
+                    // Fallback: assign untagged photos to first tour that has none
+                    if (empty($tour['photos'])) {
+                        $tour['photos']              = $tempFileMap['__unassigned'];
+                        $tempFileMap['__unassigned']  = [];
+                    }
+                }
+            }
+            unset($tour);
+        }
+
         if ($onboardData) {
             try {
-                $cleanReply = $this->processOnboard($onboardData, $sessionId);
+                $previewUrl = $onboarding->onboard($onboardData, $sessionId);
+                $email      = $onboardData['operator']['email'] ?? '';
+                $cleanReply = "Página criada. Você pode visualizá-la em:\n{$previewUrl}\n\nEnviamos um e-mail para {$email} com o link para ativar sua conta e acessar o painel. Qualquer dúvida, estou aqui.";
             } catch (\Throwable $e) {
-                Log::error('parceiros.onboard: processOnboard failed', ['error' => $e->getMessage()]);
+                Log::error('parceiros.onboard failed', ['error' => $e->getMessage()]);
                 $cleanReply = 'Ocorreu um erro ao criar sua página. Nossa equipe foi notificada — tente novamente em alguns minutos.';
             }
-        } elseif (str_contains($rawReply, '"action":')) {
-            // Reply contains JSON fragment we couldn't parse — never show raw JSON to operator
-            Log::warning('parceiros.onboard: JSON detected but unparseable', ['reply' => substr($rawReply, 0, 300)]);
+        } elseif (!$confirmedData && str_contains($rawReply, '"action":')) {
+            Log::warning('parceiros: JSON detected but unparseable', ['reply' => substr($rawReply, 0, 300)]);
             $cleanReply = 'Estou finalizando o cadastro. Pode levar alguns segundos — tente novamente em instantes.';
         }
 
@@ -103,17 +149,105 @@ class ParceirosController extends Controller
                 'updated_at' => now(),
             ];
         }
+        // Save rawReply so [PHOTO_FOR:xxx] tags persist for future photo context lookups
         $rows[] = [
             'session_id' => $sessionId,
             'uuid'       => $sessionId,
             'role'       => 'assistant',
-            'message'    => $cleanReply,
+            'message'    => $rawReply,
             'created_at' => now(),
             'updated_at' => now(),
         ];
         DB::table('lara_conversations')->insert($rows);
 
         return response()->json(['reply' => $cleanReply]);
+    }
+
+    private function makeFetchUrlExecutor(string $sessionId): callable
+    {
+        return function (string $name, array $input) use ($sessionId): mixed {
+            if ($name !== 'fetch_url') return 'Unknown tool.';
+
+            $url = $input['url'] ?? '';
+            if (!filter_var($url, FILTER_VALIDATE_URL)) {
+                return 'Invalid URL.';
+            }
+
+            try {
+                $response = Http::timeout(10)->get($url);
+                if (!$response->successful()) {
+                    return "Could not fetch URL (HTTP {$response->status()}).";
+                }
+
+                $contentType = strtolower($response->header('Content-Type') ?? '');
+                $mime        = explode(';', $contentType)[0];
+                $body        = $response->body();
+
+                if (str_starts_with($mime, 'image/')) {
+                    $filename   = basename(parse_url($url, PHP_URL_PATH)) ?: uniqid('img_') . '.jpg';
+                    $tripSlug   = $input['photo_for_trip'] ?? null;
+                    $savedName  = $tripSlug ? "{$tripSlug}__{$filename}" : $filename;
+                    $this->saveTempPhotoContent($sessionId, $savedName, $body);
+                    return [
+                        ['type' => 'image', 'source' => ['type' => 'base64', 'media_type' => $mime ?: 'image/jpeg', 'data' => base64_encode($body)]],
+                    ];
+                }
+
+                if (str_contains($mime, 'pdf')) {
+                    return [
+                        ['type' => 'text',     'text' => "PDF fetched from {$url}"],
+                        ['type' => 'document', 'source' => ['type' => 'base64', 'media_type' => 'application/pdf', 'data' => base64_encode($body)]],
+                    ];
+                }
+
+                // HTML or plain text — strip tags, truncate
+                $text = strip_tags($body);
+                $text = preg_replace('/\s+/', ' ', trim($text));
+                return substr($text, 0, 4000);
+            } catch (\Throwable $e) {
+                Log::warning('parceiros: fetch_url failed', ['url' => $url, 'error' => $e->getMessage()]);
+                return "Could not fetch URL: {$e->getMessage()}";
+            }
+        };
+    }
+
+    private function listTempFiles(string $sessionId): array
+    {
+        $files  = Storage::disk('local')->files("temp/{$sessionId}");
+        $groups = [];
+        foreach ($files as $file) {
+            $basename = basename($file);
+            if (str_contains($basename, '__')) {
+                [$slug, ] = explode('__', $basename, 2);
+                $groups[$slug][] = $basename;
+            } else {
+                $groups['__unassigned'][] = $basename;
+            }
+        }
+        return $groups;
+    }
+
+    private function getPhotoContext(\Illuminate\Support\Collection $history): ?string
+    {
+        // Find the most recent assistant message containing a [PHOTO_FOR:slug] tag
+        foreach ($history->where('role', 'assistant')->reverse() as $msg) {
+            if (preg_match('/\[PHOTO_FOR:([^\]]+)\]/', $msg->message, $m)) {
+                return $m[1];
+            }
+        }
+        return null;
+    }
+
+    private function saveTempPhotoContent(string $sessionId, string $filename, string $content): void
+    {
+        $dest = "temp/{$sessionId}/" . basename($filename);
+        Storage::disk('local')->put($dest, $content);
+    }
+
+    private function saveTempPhoto(string $sessionId, string $filename, string $realPath): void
+    {
+        $dest = "temp/{$sessionId}/" . basename($filename);
+        Storage::disk('local')->put($dest, file_get_contents($realPath));
     }
 
     private function extractDocx(string $path): string
@@ -124,11 +258,9 @@ class ParceirosController extends Controller
             $xml = $zip->getFromName('word/document.xml');
             $zip->close();
             if (!$xml) return '[Documento vazio ou formato inválido.]';
-            // Strip XML tags, preserve paragraph breaks
             $text = preg_replace('/<w:p[ >]/', "\n<w:p>", $xml);
             $text = strip_tags($text);
-            $text = preg_replace('/\n{3,}/', "\n\n", trim($text));
-            return $text;
+            return preg_replace('/\n{3,}/', "\n\n", trim($text));
         } catch (\Throwable $e) {
             return '[Não foi possível ler o documento.]';
         }
@@ -154,14 +286,29 @@ class ParceirosController extends Controller
         }
     }
 
+    private function extractConfirmedJson(string $reply): ?array
+    {
+        $stripped = preg_replace('/```json\s*|\s*```/', '', $reply);
+        $pos      = strpos($stripped, '{"action":"confirmed"');
+        if ($pos === false) return null;
+
+        $candidate = substr($stripped, $pos);
+        for ($i = strlen($candidate); $i > 0; $i--) {
+            if ($candidate[$i - 1] !== '}') continue;
+            $data = json_decode(substr($candidate, 0, $i), true);
+            if (is_array($data) && ($data['action'] ?? '') === 'confirmed') {
+                return $data;
+            }
+        }
+        return null;
+    }
+
     private function extractOnboardJson(string $reply): ?array
     {
         $stripped = preg_replace('/```json\s*|\s*```/', '', $reply);
-
-        $pos = strpos($stripped, '{"action":');
+        $pos      = strpos($stripped, '{"action":');
         if ($pos === false) return null;
 
-        // Walk backwards from end finding the last } to get complete JSON
         $candidate = substr($stripped, $pos);
         for ($i = strlen($candidate); $i > 0; $i--) {
             if ($candidate[$i - 1] !== '}') continue;
@@ -171,108 +318,5 @@ class ParceirosController extends Controller
             }
         }
         return null;
-    }
-
-    private function processOnboard(array $data, string $sessionId): string
-    {
-        $op = $data['operator'] ?? [];
-        $email    = trim($op['email'] ?? '');
-        $bizName  = trim($op['business_name'] ?? '');
-        $whatsapp = trim($op['whatsapp'] ?? '');
-        $city     = trim($op['city'] ?? '');
-        $state    = trim($op['state'] ?? '');
-
-        if (!$email || !$bizName) {
-            Log::warning('parceiros.onboard: missing email or business_name', $op);
-            return 'Preciso do seu e-mail para finalizar o cadastro. Pode me informar?';
-        }
-
-        $token = Str::random(64);
-
-        $user = User::where('email', $email)->first();
-        if (!$user) {
-            $user = User::create([
-                'name'                        => $bizName,
-                'email'                       => $email,
-                'password'                    => Hash::make(Str::random(32)),
-                'role'                        => 'provider',
-                'activation_token'            => $token,
-                'activation_token_expires_at' => now()->addHours(72),
-            ]);
-        } else {
-            // Refresh token so the activation email always has a valid link
-            $user->update([
-                'activation_token'            => $token,
-                'activation_token_expires_at' => now()->addHours(72),
-            ]);
-        }
-
-        $bankDetails = isset($op['bank']) ? $op['bank'] : null;
-        $provider = Provider::where('user_id', $user->id)->first();
-        if (!$provider) {
-            $provider = Provider::create([
-                'user_id'         => $user->id,
-                'business_name'   => $bizName,
-                'whatsapp_number' => $whatsapp ?: null,
-                'bank_details'    => $bankDetails,
-                'status'          => 'pending',
-            ]);
-        } else {
-            // Update whatsapp/bank if newly provided
-            $provider->update(array_filter([
-                'whatsapp_number' => $whatsapp ?: null,
-                'bank_details'    => $bankDetails ?? $provider->bank_details,
-            ]));
-        }
-
-        // Link conversation rows to provider
-        DB::table('lara_conversations')
-            ->where('session_id', $sessionId)
-            ->update(['provider_id' => $provider->id, 'email' => $email, 'whatsapp' => $whatsapp ?: null]);
-
-        // Create activities
-        foreach ($data['tours'] ?? [] as $tour) {
-            $catSlug = $tour['category_slug'] ?? null;
-            $catName = $tour['category_name'] ?? $catSlug;
-
-            $category = null;
-            if ($catSlug) {
-                $category = Category::where('slug', $catSlug)->first()
-                    ?? Category::create(['name' => $catName, 'slug' => $catSlug]);
-            }
-
-            $actSlug = Str::slug($tour['name'] ?? $bizName);
-            $suffix  = 2;
-            $base    = $actSlug;
-            while (Activity::where('slug', $actSlug)->exists()) {
-                $actSlug = $base . '-' . $suffix++;
-            }
-
-            Activity::create([
-                'provider_id'      => $provider->id,
-                'category_id'      => $category?->id,
-                'name'             => $tour['name'] ?? 'Passeio',
-                'slug'             => $actSlug,
-                'description'      => $tour['description'] ?? null,
-                'price'            => $tour['price'] ?? 0,
-                'duration_minutes' => $tour['duration_minutes'] ?? 60,
-                'capacity'         => $tour['max_seats'] ?? $tour['daily_seats'] ?? 4,
-                'city'             => $city,
-                'state'            => $state,
-                'meeting_point'    => $tour['meeting_point'] ?? null,
-                'is_active'        => true,
-            ]);
-        }
-
-        // Send activation email
-        try {
-            Mail::to($email)->send(new AccountActivationMail($user));
-        } catch (\Throwable $e) {
-            Log::error('parceiros.onboard: email failed', ['error' => $e->getMessage()]);
-        }
-
-        $previewUrl = rtrim(env('FRONTEND_URL', 'https://envago.live'), '/') . "/operadores/{$provider->slug}?preview=true";
-
-        return "Página criada. Você pode visualizá-la em:\n{$previewUrl}\n\nEnviamos um e-mail para {$email} com o link para ativar sua conta e acessar o painel. Qualquer dúvida, estou aqui.";
     }
 }

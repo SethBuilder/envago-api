@@ -342,7 +342,7 @@
                     <path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/>
                 </svg>
             </button>
-            <input type="file" id="file-input" accept=".xlsx,.xls,.csv,.ods,.docx,.pdf,image/*" style="display:none" onchange="onFileSelected(this)">
+            <input type="file" id="file-input" accept=".xlsx,.xls,.csv,.ods,.docx,.pdf,image/*" style="display:none" multiple onchange="onFileSelected(this)">
             <textarea
                 id="msg-input"
                 class="msg-input"
@@ -377,11 +377,11 @@ const csrf     = document.querySelector('meta[name="csrf-token"]').content;
 const msgEl    = document.getElementById('messages');
 const inputEl  = document.getElementById('msg-input');
 const sendBtn  = document.getElementById('send-btn');
-let   pendingFile = null;
+let   pendingFiles = [];
 
 // ── Enable/disable send button ────────────────────────────
 function updateSendBtn() {
-    sendBtn.disabled = !inputEl.value.trim() && !pendingFile;
+    sendBtn.disabled = !inputEl.value.trim() && !pendingFiles.length;
 }
 inputEl.addEventListener('input', updateSendBtn);
 
@@ -402,13 +402,19 @@ function now() {
 }
 
 // ── Append message bubble ─────────────────────────────────
+function linkify(text) {
+    const escaped = text.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    const linked  = escaped.replace(/(https?:\/\/[^\s]+)/g, '<a href="$1" target="_blank" rel="noopener" style="color:inherit;text-decoration:underline;word-break:break-all;">$1</a>');
+    return linked.replace(/\n/g, '<br>');
+}
+
 function appendBubble(role, text) {
     const wrap = document.createElement('div');
     wrap.className = 'bubble-wrap ' + role;
 
     const bub = document.createElement('div');
     bub.className = 'bubble ' + role;
-    bub.textContent = text;
+    bub.innerHTML = linkify(text);
 
     const time = document.createElement('div');
     time.className = 'bubble-time';
@@ -430,18 +436,40 @@ function appendFileBubble(file) {
         ? (file.size/1024).toFixed(0) + ' KB'
         : (file.size/1024/1024).toFixed(1) + ' MB';
 
-    const icon = file.type.startsWith('image/') ? '🖼' :
-                 file.name.match(/\.pdf$/i) ? '📄' : '📊';
-
-    wrap.innerHTML = `
-        <div class="file-bubble">
-            <div class="file-icon">${icon}</div>
-            <div>
-                <div class="file-name">${file.name}</div>
-                <div class="file-size">${size}</div>
+    if (file.type.startsWith('image/')) {
+        const objectUrl = URL.createObjectURL(file);
+        const img = document.createElement('img');
+        img.src = objectUrl;
+        img.alt = file.name;
+        img.style.cssText = 'max-width:220px;max-height:180px;border-radius:8px;display:block;';
+        img.onload = () => URL.revokeObjectURL(objectUrl);
+        const sizeEl = document.createElement('div');
+        sizeEl.className = 'file-size';
+        sizeEl.style.cssText = 'margin-top:4px;text-align:right';
+        sizeEl.textContent = size;
+        const bubble = document.createElement('div');
+        bubble.className = 'file-bubble';
+        bubble.style.cssText = 'padding:6px;';
+        bubble.appendChild(img);
+        bubble.appendChild(sizeEl);
+        const time = document.createElement('div');
+        time.className = 'bubble-time';
+        time.style.cssText = 'text-align:right';
+        time.textContent = now();
+        wrap.appendChild(bubble);
+        wrap.appendChild(time);
+    } else {
+        const icon = file.name.match(/\.pdf$/i) ? '📄' : '📊';
+        wrap.innerHTML = `
+            <div class="file-bubble">
+                <div class="file-icon">${icon}</div>
+                <div>
+                    <div class="file-name">${file.name}</div>
+                    <div class="file-size">${size}</div>
+                </div>
             </div>
-        </div>
-        <div class="bubble-time" style="text-align:right">${now()}</div>`;
+            <div class="bubble-time" style="text-align:right">${now()}</div>`;
+    }
     msgEl.appendChild(wrap);
     scrollBottom();
 }
@@ -461,15 +489,14 @@ function removeTyping() {
 
 // ── File picker ───────────────────────────────────────────
 function onFileSelected(input) {
-    const file = input.files[0];
-    if (!file) return;
-    pendingFile = file;
+    const files = Array.from(input.files);
+    if (!files.length) return;
+    pendingFiles = pendingFiles.concat(files);
 
-    const icon = file.type.startsWith('image/') ? '🖼' :
-                 file.name.match(/\.pdf$/i) ? '📄' :
-                 file.name.match(/\.docx?$/i) ? '📝' : '📊';
+    const names = pendingFiles.map(f => f.name).join(', ');
+    const icon  = pendingFiles.every(f => f.type.startsWith('image/')) ? '🖼' : '📎';
     document.getElementById('file-preview-icon').textContent = icon;
-    document.getElementById('file-preview-name').textContent = file.name;
+    document.getElementById('file-preview-name').textContent = pendingFiles.length === 1 ? pendingFiles[0].name : `${pendingFiles.length} arquivos`;
     document.getElementById('file-preview').classList.add('show');
     input.value = '';
     updateSendBtn();
@@ -477,7 +504,7 @@ function onFileSelected(input) {
 }
 
 function clearFile() {
-    pendingFile = null;
+    pendingFiles = [];
     document.getElementById('file-preview').classList.remove('show');
     updateSendBtn();
 }
@@ -485,17 +512,17 @@ function clearFile() {
 // ── Send ──────────────────────────────────────────────────
 async function send() {
     const text = inputEl.value.trim();
-    if (!text && !pendingFile) return;
+    if (!text && !pendingFiles.length) return;
 
-    const fileToSend = pendingFile;
-    const textToSend = text;
+    const filesToSend = pendingFiles.slice();
+    const textToSend  = text;
 
     inputEl.value = '';
     autoResize(inputEl);
     clearFile();
     sendBtn.disabled = true;
 
-    if (fileToSend) appendFileBubble(fileToSend);
+    filesToSend.forEach(f => appendFileBubble(f));
     if (textToSend) appendBubble('user', textToSend);
 
     showTyping();
@@ -504,7 +531,7 @@ async function send() {
         const formData = new FormData();
         formData.append('session_id', sessionUuid);
         if (textToSend) formData.append('message', textToSend);
-        if (fileToSend) formData.append('file', fileToSend);
+        filesToSend.forEach(f => formData.append('files[]', f));
 
         const res = await fetch('/parceiros/message', {
             method: 'POST',
