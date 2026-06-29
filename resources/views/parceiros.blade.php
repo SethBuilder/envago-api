@@ -342,7 +342,7 @@
                     <path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/>
                 </svg>
             </button>
-            <input type="file" id="file-input" accept=".xlsx,.xls,.csv,.ods,.docx,.pdf,image/*" style="display:none" onchange="onFileSelected(this)">
+            <input type="file" id="file-input" accept=".xlsx,.xls,.csv,.ods,.docx,.pdf,image/*" style="display:none" multiple onchange="onFileSelected(this)">
             <textarea
                 id="msg-input"
                 class="msg-input"
@@ -377,11 +377,11 @@ const csrf     = document.querySelector('meta[name="csrf-token"]').content;
 const msgEl    = document.getElementById('messages');
 const inputEl  = document.getElementById('msg-input');
 const sendBtn  = document.getElementById('send-btn');
-let   pendingFile = null;
+let   pendingFiles = [];
 
 // ── Enable/disable send button ────────────────────────────
 function updateSendBtn() {
-    sendBtn.disabled = !inputEl.value.trim() && !pendingFile;
+    sendBtn.disabled = !inputEl.value.trim() && !pendingFiles.length;
 }
 inputEl.addEventListener('input', updateSendBtn);
 
@@ -461,15 +461,14 @@ function removeTyping() {
 
 // ── File picker ───────────────────────────────────────────
 function onFileSelected(input) {
-    const file = input.files[0];
-    if (!file) return;
-    pendingFile = file;
+    const files = Array.from(input.files);
+    if (!files.length) return;
+    pendingFiles = pendingFiles.concat(files);
 
-    const icon = file.type.startsWith('image/') ? '🖼' :
-                 file.name.match(/\.pdf$/i) ? '📄' :
-                 file.name.match(/\.docx?$/i) ? '📝' : '📊';
+    const names = pendingFiles.map(f => f.name).join(', ');
+    const icon  = pendingFiles.every(f => f.type.startsWith('image/')) ? '🖼' : '📎';
     document.getElementById('file-preview-icon').textContent = icon;
-    document.getElementById('file-preview-name').textContent = file.name;
+    document.getElementById('file-preview-name').textContent = pendingFiles.length === 1 ? pendingFiles[0].name : `${pendingFiles.length} arquivos`;
     document.getElementById('file-preview').classList.add('show');
     input.value = '';
     updateSendBtn();
@@ -477,7 +476,7 @@ function onFileSelected(input) {
 }
 
 function clearFile() {
-    pendingFile = null;
+    pendingFiles = [];
     document.getElementById('file-preview').classList.remove('show');
     updateSendBtn();
 }
@@ -485,17 +484,17 @@ function clearFile() {
 // ── Send ──────────────────────────────────────────────────
 async function send() {
     const text = inputEl.value.trim();
-    if (!text && !pendingFile) return;
+    if (!text && !pendingFiles.length) return;
 
-    const fileToSend = pendingFile;
-    const textToSend = text;
+    const filesToSend = pendingFiles.slice();
+    const textToSend  = text;
 
     inputEl.value = '';
     autoResize(inputEl);
     clearFile();
     sendBtn.disabled = true;
 
-    if (fileToSend) appendFileBubble(fileToSend);
+    filesToSend.forEach(f => appendFileBubble(f));
     if (textToSend) appendBubble('user', textToSend);
 
     showTyping();
@@ -504,7 +503,7 @@ async function send() {
         const formData = new FormData();
         formData.append('session_id', sessionUuid);
         if (textToSend) formData.append('message', textToSend);
-        if (fileToSend) formData.append('file', fileToSend);
+        filesToSend.forEach(f => formData.append('files[]', f));
 
         const res = await fetch('/parceiros/message', {
             method: 'POST',
