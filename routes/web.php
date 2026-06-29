@@ -46,7 +46,7 @@ Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(fun
 
 // Parceiros — public provider onboarding chat
 Route::get('/parceiros',          [ParceirosController::class, 'show'])->name('parceiros');
-Route::post('/parceiros/message', [ParceirosController::class, 'message'])->name('parceiros.message');
+Route::post('/parceiros/message', [ParceirosController::class, 'message'])->name('parceiros.message')->middleware('throttle:20,1');
 
 // Lara test — admin only, at /lara
 Route::middleware(['auth', 'admin'])->group(function () {

@@ -530,6 +530,7 @@ async function send() {
     try {
         const formData = new FormData();
         formData.append('session_id', sessionUuid);
+        formData.append('website', ''); // honeypot — bots fill this, humans don't
         if (textToSend) formData.append('message', textToSend);
         filesToSend.forEach(f => formData.append('files[]', f));
 

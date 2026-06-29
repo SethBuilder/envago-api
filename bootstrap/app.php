@@ -18,6 +18,7 @@ return Application::configure(basePath: dirname(__DIR__))
             'admin'    => \App\Http\Middleware\AdminMiddleware::class,
             'provider' => \App\Http\Middleware\ProviderMiddleware::class,
         ]);
+        $middleware->append(\App\Http\Middleware\BlockedIpMiddleware::class);
         $middleware->redirectGuestsTo('/login');
         $middleware->redirectUsersTo(function () {
             $user = auth()->user();

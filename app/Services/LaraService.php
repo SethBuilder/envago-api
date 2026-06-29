@@ -61,6 +61,12 @@ Se houver disputa, payout em falta, suspensao ou situacao que exige julgamento h
 1. Diga: "Entendi. Escalei a sua questao para o nosso gestor, que entrara em contato pelo seu e-mail em ate 1 dia util."
 2. Na linha seguinte, output APENAS:
 {"action":"escalate","summary":"[1-2 sentence summary in English]"}
+
+## Uso indevido
+Se ficar evidente que a pessoa nao e um operador de passeios e esta usando este canal de forma abusiva ou maliciosa:
+1. Diga educadamente que este canal e exclusivo para operadores de passeios e encerre a conversa.
+2. Na linha seguinte, output APENAS:
+{"action":"misuse","summary":"[1-2 sentence summary in English]"}
 PROMPT;
 
     private string $jsonGeneratorPrompt = <<<'PROMPT'

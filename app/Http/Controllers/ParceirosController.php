@@ -26,6 +26,12 @@ class ParceirosController extends Controller
             'files.*'    => 'nullable|file|max:20480',
         ]);
 
+        // Honeypot — bots fill this field, humans don't
+        if ($request->filled('website')) {
+            $this->blockIp($request->ip(), 'honeypot');
+            return response()->json(['reply' => ''], 200);
+        }
+
         set_time_limit(120);
 
         $sessionId   = $request->input('session_id');
@@ -133,6 +139,8 @@ class ParceirosController extends Controller
                 Log::error('parceiros.onboard failed', ['error' => $e->getMessage()]);
                 $cleanReply = 'Ocorreu um erro ao criar sua página. Nossa equipe foi notificada — tente novamente em alguns minutos.';
             }
+        } elseif (!$confirmedData && str_contains($rawReply, '"action":"misuse"')) {
+            $this->notifyAdminsMisuse($rawReply, $sessionId, $request->ip());
         } elseif (!$confirmedData && str_contains($rawReply, '"action":')) {
             Log::warning('parceiros: JSON detected but unparseable', ['reply' => substr($rawReply, 0, 300)]);
             $cleanReply = 'Estou finalizando o cadastro. Pode levar alguns segundos — tente novamente em instantes.';
@@ -161,6 +169,33 @@ class ParceirosController extends Controller
         DB::table('lara_conversations')->insert($rows);
 
         return response()->json(['reply' => $cleanReply]);
+    }
+
+    private function blockIp(string $ip, string $reason): void
+    {
+        DB::table('blocked_ips')->updateOrInsert(['ip' => $ip], ['reason' => $reason, 'updated_at' => now(), 'created_at' => now()]);
+        \Illuminate\Support\Facades\Cache::forget("blocked_ip:{$ip}");
+        Log::warning('parceiros: IP blocked', ['ip' => $ip, 'reason' => $reason]);
+    }
+
+    private function notifyAdminsMisuse(string $reply, string $sessionId, string $ip): void
+    {
+        preg_match('/"summary"\s*:\s*"([^"]+)"/', $reply, $m);
+        $summary = $m[1] ?? 'No summary.';
+
+        $this->blockIp($ip, "misuse: {$summary}");
+
+        $admins = \App\Models\User::where('role', 'admin')->pluck('email');
+        foreach ($admins as $email) {
+            try {
+                \Illuminate\Support\Facades\Mail::raw(
+                    "Misuse detected on /parceiros\n\nSession: {$sessionId}\nIP: {$ip}\n\nSummary: {$summary}",
+                    fn($msg) => $msg->to($email)->subject('Envago — /parceiros misuse alert')
+                );
+            } catch (\Throwable $e) {
+                Log::error('parceiros: misuse email failed', ['error' => $e->getMessage()]);
+            }
+        }
     }
 
     private function makeFetchUrlExecutor(string $sessionId): callable
