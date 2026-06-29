@@ -38,7 +38,7 @@ Ao receber qualquer conteudo, analise tudo junto antes de responder — dados te
 
 Quando tiver uma visao clara dos passeios, mostre um resumo e pergunte se pode criar a pagina. Nao mencione URLs, slugs ou links.
 
-Apos confirmacao, peca fotos para cada passeio de forma conversacional. Se ja tiver fotos recebidas, confirme a qual passeio cada uma pertence. Se o operador nao tiver agora, diga que pode adicionar depois pelo painel. Registre internamente o nome exato de cada arquivo para cada passeio.
+Antes de confirmar, certifique-se de que cada passeio tem pelo menos uma foto. Aproveite tudo que o operador já enviou — imagens, arquivos, links. Se ainda faltar, peça. Só oriente a adicionar pelo painel se não for possível obter a foto agora. Quando pedir ou buscar fotos de um passeio específico, adicione ao final da sua mensagem a tag `[PHOTO_FOR:slug-do-passeio]` onde slug é o nome do passeio em minúsculas com hifens (ex: `[PHOTO_FOR:buggy-leste-classico]`). O operador não vê esta tag — é apenas para o sistema saber a qual passeio pertencem as fotos recebidas.
 
 Em seguida, ofeca receber os dados bancarios para os repasses — nome completo do titular, CPF ou CNPJ, nome do banco, SWIFT/BIC, agencia, numero da conta e tipo (corrente ou poupanca), endereco com CEP — ou deixar para depois pelo painel.
 
@@ -48,13 +48,12 @@ Output APENAS o JSON abaixo, em uma unica linha continua.
 NENHUM texto antes. NENHUM texto depois. Sem markdown. Sem explicacao.
 O sistema intercepta este JSON, gera a pagina e envia a resposta ao operador automaticamente.
 
-{"action":"confirmed","business_name":"string","email":"string","whatsapp":"string or empty","city":"string","state":"2-letter UF","bank":"pendente or dados bancarios completos em texto","tours":"nome|categoria|preco|duracao_min|capacidade|dias(0-6 separados por virgula)|horarios(separados por virgula)|ponto_encontro|fotos(filenames separados por virgula) — uma linha por passeio separadas por ponto-e-virgula"}
+{"action":"confirmed","business_name":"string","email":"string","whatsapp":"string or empty","city":"string","state":"2-letter UF","bank":"pendente or dados bancarios completos em texto","tours":"nome|categoria|preco|duracao_min|capacidade|dias(0-6 separados por virgula)|horarios(separados por virgula)|ponto_encontro — uma linha por passeio separadas por ponto-e-virgula"}
 
 Regras (restricoes do sistema):
 - city e state nao podem ser vazios.
 - "business_name": use exatamente o nome que o operador informou.
 - dias: 0=domingo,1=segunda,...,6=sabado.
-- fotos: nomes exatos dos arquivos recebidos. Vazio se nenhum.
 - bank: "pendente" se operador escolheu preencher depois.
 
 ## Escalonamento
@@ -86,13 +85,6 @@ PROMPT;
         $summary .= "CITY: {$confirmed['city']}\n";
         $summary .= "STATE: {$confirmed['state']}\n";
         $summary .= "BANK: {$confirmed['bank']}\n";
-
-        $tempFiles = $confirmed['temp_files'] ?? [];
-        if (!empty($tempFiles)) {
-            $summary .= "PHOTOS SAVED ON SERVER (use these exact filenames — do not invent names): " . implode(', ', $tempFiles) . "\n";
-            $summary .= "Assign photos to tours based on what was discussed. If one photo covers multiple tours, repeat the filename.\n";
-        }
-
         $summary .= "TOURS:\n{$confirmed['tours']}";
 
         $response = Http::timeout(90)->withHeaders([
@@ -112,12 +104,13 @@ PROMPT;
     private array $parceirosTools = [
         [
             'name'         => 'fetch_url',
-            'description'  => 'Fetch content from a URL. ALWAYS call this when you encounter any URL in the operator\'s data — do not reference URLs by name or invent filenames. Retrieve the actual content so it can be used on the operator\'s page.',
+            'description'  => 'Fetch content from a URL. ALWAYS call this when you encounter any URL in the operator\'s data — do not reference URLs by name or invent filenames. Retrieve the actual content so it can be used on the operator\'s page. When fetching an image for a specific trip, pass the trip slug in photo_for_trip so the system stores it against the correct trip.',
             'input_schema' => [
                 'type'       => 'object',
                 'properties' => [
-                    'url'    => ['type' => 'string', 'description' => 'The URL to fetch'],
-                    'reason' => ['type' => 'string', 'description' => 'Why you are fetching this URL'],
+                    'url'            => ['type' => 'string', 'description' => 'The URL to fetch'],
+                    'reason'         => ['type' => 'string', 'description' => 'Why you are fetching this URL'],
+                    'photo_for_trip' => ['type' => 'string', 'description' => 'Slug of the trip this image belongs to (e.g. "buggy-por-do-sol"). Only set when fetching a trip photo.'],
                 ],
                 'required'   => ['url'],
             ],
@@ -126,7 +119,7 @@ PROMPT;
 
     private function parceirosOpening(): string
     {
-        return "Olá. Bem-vindo ao Envago — a plataforma onde turistas encontram e reservam passeios no Brasil. Criamos sua página gratuitamente e cuidamos dos anúncios no Google e Instagram para trazer os turistas até você. Para começar, me manda a lista de passeios que você oferece com os preços. Pode ser planilha, foto, PDF ou digita aqui mesmo.";
+        return "Olá. Bem-vindo ao Envago — a plataforma onde turistas encontram e reservam passeios no Brasil.\n\nCriamos sua página gratuitamente e cuidamos dos anúncios no Google e Instagram para trazer os turistas até você.\n\nPara começar, me manda a lista de passeios que você oferece com os preços. Pode ser planilha, foto, PDF ou digita aqui mesmo.";
     }
 
     private function websiteOpening(): string
@@ -150,7 +143,7 @@ PROMPT;
     ): string {
         $messages = collect($history)->map(fn($m) => [
             'role'    => $m->role,
-            'content' => $m->message,
+            'content' => preg_replace('/\s*\[PHOTO_FOR:[^\]]+\]/', '', $m->message),
         ])->toArray();
 
         if ($context === 'website' && empty($history) && $userMessage === 'Olá') {
@@ -177,9 +170,9 @@ PROMPT;
         $useTools = $context === 'parceiros' && $toolExecutor !== null;
 
         // Tool use loop — runs up to 5 iterations to handle chained tool calls
-        for ($iteration = 0; $iteration < 5; $iteration++) {
+        for ($iteration = 0; $iteration < 10; $iteration++) {
             $payload = [
-                'model'      => 'claude-haiku-4-5-20251001',
+                'model'      => 'claude-sonnet-4-6',
                 'max_tokens' => 4096,
                 'system'     => $systemPrompt,
                 'messages'   => $messages,
@@ -222,6 +215,7 @@ PROMPT;
             $messages[] = ['role' => 'user',      'content' => $toolResults];
         }
 
+        \Illuminate\Support\Facades\Log::error('lara: tool use loop exhausted', ['context' => $context]);
         return 'Desculpe, ocorreu um problema interno. Tente novamente.';
     }
 }

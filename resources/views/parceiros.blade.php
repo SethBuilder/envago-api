@@ -404,7 +404,8 @@ function now() {
 // ── Append message bubble ─────────────────────────────────
 function linkify(text) {
     const escaped = text.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
-    return escaped.replace(/(https?:\/\/[^\s]+)/g, '<a href="$1" target="_blank" rel="noopener" style="color:inherit;text-decoration:underline;word-break:break-all;">$1</a>');
+    const linked  = escaped.replace(/(https?:\/\/[^\s]+)/g, '<a href="$1" target="_blank" rel="noopener" style="color:inherit;text-decoration:underline;word-break:break-all;">$1</a>');
+    return linked.replace(/\n/g, '<br>');
 }
 
 function appendBubble(role, text) {
@@ -435,18 +436,40 @@ function appendFileBubble(file) {
         ? (file.size/1024).toFixed(0) + ' KB'
         : (file.size/1024/1024).toFixed(1) + ' MB';
 
-    const icon = file.type.startsWith('image/') ? '🖼' :
-                 file.name.match(/\.pdf$/i) ? '📄' : '📊';
-
-    wrap.innerHTML = `
-        <div class="file-bubble">
-            <div class="file-icon">${icon}</div>
-            <div>
-                <div class="file-name">${file.name}</div>
-                <div class="file-size">${size}</div>
+    if (file.type.startsWith('image/')) {
+        const objectUrl = URL.createObjectURL(file);
+        const img = document.createElement('img');
+        img.src = objectUrl;
+        img.alt = file.name;
+        img.style.cssText = 'max-width:220px;max-height:180px;border-radius:8px;display:block;';
+        img.onload = () => URL.revokeObjectURL(objectUrl);
+        const sizeEl = document.createElement('div');
+        sizeEl.className = 'file-size';
+        sizeEl.style.cssText = 'margin-top:4px;text-align:right';
+        sizeEl.textContent = size;
+        const bubble = document.createElement('div');
+        bubble.className = 'file-bubble';
+        bubble.style.cssText = 'padding:6px;';
+        bubble.appendChild(img);
+        bubble.appendChild(sizeEl);
+        const time = document.createElement('div');
+        time.className = 'bubble-time';
+        time.style.cssText = 'text-align:right';
+        time.textContent = now();
+        wrap.appendChild(bubble);
+        wrap.appendChild(time);
+    } else {
+        const icon = file.name.match(/\.pdf$/i) ? '📄' : '📊';
+        wrap.innerHTML = `
+            <div class="file-bubble">
+                <div class="file-icon">${icon}</div>
+                <div>
+                    <div class="file-name">${file.name}</div>
+                    <div class="file-size">${size}</div>
+                </div>
             </div>
-        </div>
-        <div class="bubble-time" style="text-align:right">${now()}</div>`;
+            <div class="bubble-time" style="text-align:right">${now()}</div>`;
+    }
     msgEl.appendChild(wrap);
     scrollBottom();
 }

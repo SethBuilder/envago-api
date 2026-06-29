@@ -119,13 +119,12 @@ class OnboardingService
     {
         if (empty($filenames)) return [];
 
-        $tempDir = storage_path("app/temp/{$sessionId}");
-        $paths   = [];
+        $paths = [];
 
         foreach ($filenames as $filename) {
-            $path = $tempDir . '/' . basename($filename);
-            if (file_exists($path)) {
-                $paths[] = $path;
+            $relative = "temp/{$sessionId}/" . basename($filename);
+            if (Storage::disk('local')->exists($relative)) {
+                $paths[] = Storage::disk('local')->path($relative);
             } else {
                 Log::warning("onboarding: temp photo not found", ['session' => $sessionId, 'file' => $filename]);
             }
@@ -137,8 +136,8 @@ class OnboardingService
     private function cleanTempFolder(string $sessionId): void
     {
         $tempDir = "temp/{$sessionId}";
-        if (Storage::exists($tempDir)) {
-            Storage::deleteDirectory($tempDir);
+        if (Storage::disk('local')->exists($tempDir)) {
+            Storage::disk('local')->deleteDirectory($tempDir);
         }
     }
 

@@ -15,18 +15,19 @@ class PurgeTempUploads extends Command
         $cutoff = now()->subHours(24)->timestamp;
         $purged = 0;
 
-        foreach (Storage::directories('temp') as $dir) {
-            // Get the most recent file timestamp in the folder
-            $files = Storage::files($dir);
+        $disk = Storage::disk('local');
+
+        foreach ($disk->directories('temp') as $dir) {
+            $files = $disk->files($dir);
             if (empty($files)) {
-                Storage::deleteDirectory($dir);
+                $disk->deleteDirectory($dir);
                 $purged++;
                 continue;
             }
 
-            $newest = max(array_map(fn($f) => Storage::lastModified($f), $files));
+            $newest = max(array_map(fn($f) => $disk->lastModified($f), $files));
             if ($newest < $cutoff) {
-                Storage::deleteDirectory($dir);
+                $disk->deleteDirectory($dir);
                 $purged++;
             }
         }

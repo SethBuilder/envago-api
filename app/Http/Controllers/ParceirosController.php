@@ -41,6 +41,9 @@ class ParceirosController extends Controller
         $fileBlocks  = [];
         $uploadedMsg = '';
 
+        // Extract photo context from last assistant message (Lara's [PHOTO_FOR:slug] tag)
+        $photoContext = $this->getPhotoContext($history);
+
         if ($request->hasFile('files')) {
             foreach ($request->file('files') as $file) {
                 $filename = $file->getClientOriginalName();
@@ -60,11 +63,10 @@ class ParceirosController extends Controller
                         'title'  => $filename,
                     ];
                 } elseif (str_starts_with($mime ?? '', 'image/')) {
-                    // Save to temp storage so OnboardingService can link to activities later
-                    $this->saveTempPhoto($sessionId, $filename, $file->getRealPath());
+                    // Save to temp storage with slug prefix if photo context is known
+                    $savedName = $photoContext ? "{$photoContext}__{$filename}" : $filename;
+                    $this->saveTempPhoto($sessionId, $savedName, $file->getRealPath());
 
-                    // Tell Lara the exact filename so she can reference it in the photos array
-                    $fileBlocks[] = ['type' => 'text', 'text' => "Photo uploaded. Filename: {$filename}. Use this exact filename in the photos array for the tour this image belongs to."];
                     $fileBlocks[] = [
                         'type'   => 'image',
                         'source' => ['type' => 'base64', 'media_type' => $mime, 'data' => base64_encode(file_get_contents($file->getRealPath()))],
@@ -89,22 +91,37 @@ class ParceirosController extends Controller
         );
 
         // Intercept confirmed/onboard JSON
-        Log::info('parceiros.raw_reply', ['session' => $sessionId, 'reply' => substr($rawReply, 0, 500)]);
-        $cleanReply    = $rawReply;
+        $cleanReply    = preg_replace('/\s*\[PHOTO_FOR:[^\]]+\]/', '', $rawReply);
         $confirmedData = $this->extractConfirmedJson($rawReply);
         $onboardData   = $confirmedData ? null : $this->extractOnboardJson($rawReply);
 
         if ($confirmedData) {
             try {
-                $confirmedData['temp_files'] = $this->listTempFiles($sessionId);
                 $jsonStr     = $lara->generateOnboardJson($confirmedData);
-                Log::info('parceiros.generated_json', ['session' => $sessionId, 'json' => substr($jsonStr, 0, 500)]);
                 $onboardData = $this->extractOnboardJson($jsonStr);
                 if (!$onboardData) throw new \RuntimeException("JSON generator returned invalid JSON: " . substr($jsonStr, 0, 200));
             } catch (\Throwable $e) {
                 Log::error('parceiros.json_generation failed', ['error' => $e->getMessage()]);
                 $cleanReply = 'Ocorreu um erro ao finalizar o cadastro. Nossa equipe foi notificada — tente novamente.';
             }
+        }
+
+        // Post-process: assign temp photos to tours by slug prefix — no LLM involved
+        if ($onboardData) {
+            $tempFileMap = $this->listTempFiles($sessionId);
+            foreach ($onboardData['tours'] as &$tour) {
+                $slug = \Illuminate\Support\Str::slug($tour['name']);
+                if (isset($tempFileMap[$slug])) {
+                    $tour['photos'] = $tempFileMap[$slug];
+                } elseif (isset($tempFileMap['__unassigned'])) {
+                    // Fallback: assign untagged photos to first tour that has none
+                    if (empty($tour['photos'])) {
+                        $tour['photos']              = $tempFileMap['__unassigned'];
+                        $tempFileMap['__unassigned']  = [];
+                    }
+                }
+            }
+            unset($tour);
         }
 
         if ($onboardData) {
@@ -132,11 +149,12 @@ class ParceirosController extends Controller
                 'updated_at' => now(),
             ];
         }
+        // Save rawReply so [PHOTO_FOR:xxx] tags persist for future photo context lookups
         $rows[] = [
             'session_id' => $sessionId,
             'uuid'       => $sessionId,
             'role'       => 'assistant',
-            'message'    => $cleanReply,
+            'message'    => $rawReply,
             'created_at' => now(),
             'updated_at' => now(),
         ];
@@ -166,10 +184,11 @@ class ParceirosController extends Controller
                 $body        = $response->body();
 
                 if (str_starts_with($mime, 'image/')) {
-                    $filename = basename(parse_url($url, PHP_URL_PATH)) ?: uniqid('img_') . '.jpg';
-                    $this->saveTempPhotoContent($sessionId, $filename, $body);
+                    $filename   = basename(parse_url($url, PHP_URL_PATH)) ?: uniqid('img_') . '.jpg';
+                    $tripSlug   = $input['photo_for_trip'] ?? null;
+                    $savedName  = $tripSlug ? "{$tripSlug}__{$filename}" : $filename;
+                    $this->saveTempPhotoContent($sessionId, $savedName, $body);
                     return [
-                        ['type' => 'text', 'text' => "Image fetched. Filename for reference: {$filename}"],
                         ['type' => 'image', 'source' => ['type' => 'base64', 'media_type' => $mime ?: 'image/jpeg', 'data' => base64_encode($body)]],
                     ];
                 }
@@ -194,20 +213,41 @@ class ParceirosController extends Controller
 
     private function listTempFiles(string $sessionId): array
     {
-        $files = Storage::files("temp/{$sessionId}");
-        return array_map(fn($f) => basename($f), $files);
+        $files  = Storage::disk('local')->files("temp/{$sessionId}");
+        $groups = [];
+        foreach ($files as $file) {
+            $basename = basename($file);
+            if (str_contains($basename, '__')) {
+                [$slug, ] = explode('__', $basename, 2);
+                $groups[$slug][] = $basename;
+            } else {
+                $groups['__unassigned'][] = $basename;
+            }
+        }
+        return $groups;
+    }
+
+    private function getPhotoContext(\Illuminate\Support\Collection $history): ?string
+    {
+        // Find the most recent assistant message containing a [PHOTO_FOR:slug] tag
+        foreach ($history->where('role', 'assistant')->reverse() as $msg) {
+            if (preg_match('/\[PHOTO_FOR:([^\]]+)\]/', $msg->message, $m)) {
+                return $m[1];
+            }
+        }
+        return null;
     }
 
     private function saveTempPhotoContent(string $sessionId, string $filename, string $content): void
     {
         $dest = "temp/{$sessionId}/" . basename($filename);
-        Storage::put($dest, $content);
+        Storage::disk('local')->put($dest, $content);
     }
 
     private function saveTempPhoto(string $sessionId, string $filename, string $realPath): void
     {
         $dest = "temp/{$sessionId}/" . basename($filename);
-        Storage::put($dest, file_get_contents($realPath));
+        Storage::disk('local')->put($dest, file_get_contents($realPath));
     }
 
     private function extractDocx(string $path): string
