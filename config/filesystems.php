@@ -38,7 +38,17 @@ return [
             'report' => false,
         ],
 
-        'public' => [
+        'public' => env('AWS_BUCKET') ? [
+            'driver'   => 's3',
+            'key'      => env('AWS_ACCESS_KEY_ID'),
+            'secret'   => env('AWS_SECRET_ACCESS_KEY'),
+            'region'   => env('AWS_DEFAULT_REGION', 'sa-east-1'),
+            'bucket'   => env('AWS_BUCKET'),
+            'url'      => env('AWS_URL'),
+            'visibility' => 'public',
+            'throw'    => false,
+            'report'   => false,
+        ] : [
             'driver' => 'local',
             'root' => storage_path('app/public'),
             'url' => rtrim(env('APP_URL', 'http://localhost'), '/').'/storage',
