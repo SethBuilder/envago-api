@@ -150,7 +150,11 @@
     @else
     @foreach($history as $msg)
     <div class="lara-msg {{ $msg->role }}">
+      @if($msg->role === 'assistant')
+      <div class="lara-bubble" data-raw="{{ $msg->message }}"></div>
+      @else
       <div class="lara-bubble">{{ $msg->message }}</div>
+      @endif
       <div class="lara-ts">{{ \Carbon\Carbon::parse($msg->created_at)->format('d/m H:i') }}</div>
     </div>
     @endforeach
@@ -175,7 +179,18 @@
 (function () {
   var thinking = false;
 
+  function renderBubble(text) {
+    var html = text.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    html = html.replace(/\[IMAGE:(https?:\/\/[^\]]+)\]/g, function(_, url) {
+      return '<img src="' + url + '" style="max-width:100%;border-radius:10px;margin-top:8px;display:block;" onerror="this.style.display=\'none\'">';
+    });
+    return html;
+  }
+
   var msgs = document.getElementById('messages');
+  document.querySelectorAll('.lara-bubble[data-raw]').forEach(function(el) {
+    el.innerHTML = renderBubble(el.getAttribute('data-raw'));
+  });
   if (msgs) msgs.scrollTop = msgs.scrollHeight;
 
   window.handleKey = function (e) {
@@ -227,8 +242,14 @@
     row.className = 'lara-msg ' + role;
     var bubble = document.createElement('div');
     bubble.className = 'lara-bubble';
-    bubble.textContent = text;
-    row.appendChild(bubble);
+    if (role === 'assistant') {
+      var wrap = document.createElement('div');
+      wrap.innerHTML = '<div class="lara-bubble">' + renderBubble(text) + '</div>';
+      row.appendChild(wrap.firstChild);
+    } else {
+      bubble.textContent = text;
+      row.appendChild(bubble);
+    }
     msgs.appendChild(row);
     msgs.scrollTop = msgs.scrollHeight;
     return row;

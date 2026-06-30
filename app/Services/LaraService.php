@@ -168,6 +168,27 @@ When Seif says "when providers ask about X, say Y" or "tell Lara to always say Z
 
 To see or manage existing instructions, use list_instructions or delete_instruction.
 
+## Meta Ad Creation — Two-Step Flow
+When Seif asks to create an ad:
+
+**Step 1 — Draft (do this automatically):**
+1. Pull relevant DB context (query_activities, query_providers) to inform copy and targeting
+2. Write ad copy: headline + body in PT-BR, punchy and on-brand
+3. Write a detailed English image generation prompt (vivid, cinematic, relevant to the category/city)
+4. Call generate_creative with that prompt
+5. Present to Seif:
+   - The image (as [IMAGE:url])
+   - Headline and body copy
+   - Objective, daily budget, destination URL, targeting summary
+   - Ask: "Approve to publish, or tell me what to change."
+
+**Step 2 — Publish (only on explicit approval):**
+- When Seif says "approve", "go ahead", "publish", or similar → call create_meta_ad
+- The ad is created PAUSED on Meta — Seif activates it in Ads Manager
+- Confirm with the campaign ID and Ads Manager link
+
+Never call create_meta_ad without explicit approval. Never skip Step 1.
+
 ## Tone
 Concise, professional, insightful. Lead with the insight, follow with the data.
 PROMPT;
@@ -266,6 +287,36 @@ PROMPT;
                     'permanent' => ['type' => 'boolean', 'description' => 'If true, permanently delete. If false (default), just deactivate.'],
                 ],
                 'required' => ['id'],
+            ],
+        ],
+        [
+            'name'         => 'generate_creative',
+            'description'  => 'Generate an ad creative image using AI (fal.ai FLUX). Returns the image URL. Always call this in Step 1 — never skip to create_meta_ad without showing Seif the creative first.',
+            'input_schema' => [
+                'type'       => 'object',
+                'properties' => [
+                    'prompt' => ['type' => 'string', 'description' => 'Detailed English image generation prompt. Describe scene, subjects, colors, lighting, mood. No text overlays — Meta handles copy separately.'],
+                ],
+                'required' => ['prompt'],
+            ],
+        ],
+        [
+            'name'         => 'create_meta_ad',
+            'description'  => 'Create a Meta (Facebook/Instagram) ad in PAUSED status. Only call this AFTER Seif explicitly approves the creative and copy shown in Step 1.',
+            'input_schema' => [
+                'type'       => 'object',
+                'properties' => [
+                    'campaign_name'     => ['type' => 'string',  'description' => 'Campaign name'],
+                    'objective'         => ['type' => 'string',  'description' => 'OUTCOME_TRAFFIC or OUTCOME_LEADS'],
+                    'daily_budget_brl'  => ['type' => 'number',  'description' => 'Daily budget in BRL (e.g. 50 for R$50/day)'],
+                    'headline'          => ['type' => 'string',  'description' => 'Ad headline'],
+                    'body'              => ['type' => 'string',  'description' => 'Ad primary text / body'],
+                    'image_url'         => ['type' => 'string',  'description' => 'Image URL returned by generate_creative'],
+                    'destination_url'   => ['type' => 'string',  'description' => 'URL users land on after clicking'],
+                    'targeting_age_min' => ['type' => 'integer', 'description' => 'Min age (default 25)'],
+                    'targeting_age_max' => ['type' => 'integer', 'description' => 'Max age (default 55)'],
+                ],
+                'required' => ['campaign_name', 'objective', 'daily_budget_brl', 'headline', 'body', 'image_url', 'destination_url'],
             ],
         ],
     ];
