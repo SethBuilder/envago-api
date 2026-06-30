@@ -6,26 +6,23 @@
 
 {{-- Lara onboarding welcome banner --}}
 @if($laraWelcome)
-<div style="background:#f0fdf4; border:1.5px solid #22c55e; border-radius:12px; padding:20px 24px; margin-bottom:24px; display:flex; align-items:center; gap:16px;">
+<div style="background:#f0fdf4; border:1.5px solid #22c55e; border-radius:12px; padding:20px 24px; margin-bottom:24px; display:flex; flex-wrap:wrap; align-items:center; gap:16px;">
   <div style="width:40px; height:40px; background:#dcfce7; border-radius:10px; display:flex; align-items:center; justify-content:center; flex-shrink:0; font-size:20px;">🎉</div>
-  <div style="flex:1;">
+  <div style="flex:1; min-width:180px;">
     <div style="font-weight:600; color:#111; margin-bottom:4px;">Sua página foi criada pela Lara.</div>
-    <div style="font-size:14px; color:#555;">Revise seus passeios, complete os dados bancários e sua página estará pronta para receber reservas.</div>
+    <div style="font-size:14px; color:#555;">Revise seus passeios e em breve sua página estará pronta para receber reservas.</div>
   </div>
-  <div style="display:flex; gap:10px; flex-shrink:0;">
-    <a href="{{ route('provider.activities') }}" style="font-size:13px; font-weight:600; background:#111; color:#fff; padding:8px 16px; border-radius:8px; text-decoration:none;">Ver passeios</a>
-    <a href="{{ route('provider.settings') }}" style="font-size:13px; font-weight:600; background:#fff; color:#111; border:1.5px solid #ddd; padding:8px 16px; border-radius:8px; text-decoration:none;">Dados bancários</a>
-  </div>
+  <a href="{{ route('provider.activities') }}" style="font-size:13px; font-weight:600; background:#111; color:#fff; padding:8px 16px; border-radius:8px; text-decoration:none; flex-shrink:0;">Ver passeios</a>
 </div>
 @endif
 
 {{-- Bank details missing banner --}}
 @if($provider && $provider->isApproved() && empty($provider->bank_details))
-<div style="background:#fff; border:1.5px solid #FF2924; border-radius:12px; padding:20px 24px; margin-bottom:24px; display:flex; align-items:center; gap:16px;">
+<div style="background:#fff; border:1.5px solid #FF2924; border-radius:12px; padding:20px 24px; margin-bottom:24px; display:flex; flex-wrap:wrap; align-items:center; gap:16px;">
   <div style="width:40px; height:40px; background:#fff1f1; border-radius:10px; display:flex; align-items:center; justify-content:center; flex-shrink:0;">
     <svg width="20" height="20" fill="none" stroke="#FF2924" stroke-width="2" viewBox="0 0 24 24"><rect x="1" y="4" width="22" height="16" rx="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>
   </div>
-  <div style="flex:1;">
+  <div style="flex:1; min-width:180px;">
     <p style="font-size:14px; font-weight:600; color:#111; margin-bottom:2px;">Cadastre seus dados bancários</p>
     <p style="font-size:13px; color:#888;">Adicione seus dados para receber os repasses das reservas confirmadas.</p>
   </div>
