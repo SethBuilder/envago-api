@@ -261,6 +261,13 @@
 @if(config('services.google.places_key'))
 <script src="https://maps.googleapis.com/maps/api/js?key={{ config('services.google.places_key') }}&libraries=places&callback=initPlaces" async defer></script>
 @endif
+<script src="https://cdn.jsdelivr.net/npm/browser-image-compression@2.0.2/dist/browser-image-compression.js"></script>
+<script>
+async function compressPhotos(files) {
+  const opts = { maxSizeMB: 1.5, maxWidthOrHeight: 2048, useWebWorker: true };
+  return Promise.all(files.map(f => imageCompression(f, opts).catch(() => f)));
+}
+</script>
 <script>
 // ── Google Places ─────────────────────────────────────────────
 function initPlaces() {
@@ -413,7 +420,8 @@ document.getElementById('edit-form').addEventListener('submit', async function(e
 
   const formData = new FormData(this);
   formData.delete('photos[]');
-  selectedFiles.forEach(f => formData.append('photos[]', f));
+  const compressed = await compressPhotos(selectedFiles);
+  compressed.forEach(f => formData.append('photos[]', f));
 
   try {
     const res = await fetch('{{ route('provider.activities.update', $activity) }}', {
