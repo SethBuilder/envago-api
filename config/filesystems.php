@@ -39,7 +39,7 @@ return [
         ],
 
         'public' => env('AWS_BUCKET') ? array_merge(
-            ['driver' => 's3', 'region' => env('AWS_DEFAULT_REGION', 'sa-east-1'), 'bucket' => env('AWS_BUCKET'), 'url' => env('AWS_URL'), 'visibility' => 'public', 'throw' => true],
+            ['driver' => 's3', 'region' => env('AWS_DEFAULT_REGION', 'sa-east-1'), 'bucket' => env('AWS_BUCKET'), 'url' => env('AWS_URL'), 'throw' => true],
             array_filter(['key' => env('AWS_ACCESS_KEY_ID'), 'secret' => env('AWS_SECRET_ACCESS_KEY')])
         ) : [
             'driver' => 'local',

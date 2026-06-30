@@ -348,7 +348,6 @@ class ParceirosController extends Controller
 
     private function moveScopeLeadPhotos(string $sessionId, int $leadId): array
     {
-        $disk  = config('filesystems.default') === 's3' ? 's3' : 'public';
         $files = Storage::disk('local')->files("temp/{$sessionId}");
         $urls  = [];
 
@@ -358,8 +357,8 @@ class ParceirosController extends Controller
 
             $dest    = "scope_leads/{$leadId}/" . basename($file);
             $content = Storage::disk('local')->get($file);
-            Storage::disk($disk)->put($dest, $content, 'public');
-            $urls[] = Storage::disk($disk)->url($dest);
+            Storage::disk('public')->put($dest, $content);
+            $urls[] = Storage::disk('public')->url($dest);
         }
 
         return $urls;

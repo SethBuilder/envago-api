@@ -180,12 +180,12 @@ class ActivityService
 
             if ($photo instanceof UploadedFile) {
                 $ext  = strtolower($photo->getClientOriginalExtension()) ?: 'jpg';
-                $path = $photo->storeAs('activities/' . $activity->id, "{$seoName}.{$ext}", ['disk' => 'public', 'visibility' => 'public']);
+                $path = $photo->storeAs('activities/' . $activity->id, "{$seoName}.{$ext}", ['disk' => 'public']);
             } else {
                 // Absolute path to temp file — move to permanent storage with SEO name
                 $ext  = strtolower(pathinfo($photo, PATHINFO_EXTENSION)) ?: 'jpg';
                 $dest = 'activities/' . $activity->id . '/' . "{$seoName}.{$ext}";
-                Storage::disk('public')->put($dest, file_get_contents($photo), 'public');
+                Storage::disk('public')->put($dest, file_get_contents($photo));
                 $path = $dest;
             }
 

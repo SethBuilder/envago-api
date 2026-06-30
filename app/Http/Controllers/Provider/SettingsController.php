@@ -36,13 +36,12 @@ class SettingsController extends Controller
 
         $logoUrl = $provider->logo_url;
         if ($request->hasFile('logo')) {
-            $disk = config('filesystems.default') === 's3' ? 's3' : 'public';
             if ($provider->logo_url) {
-                $oldPath = str_replace(Storage::disk($disk)->url(''), '', $provider->logo_url);
-                Storage::disk($disk)->delete($oldPath);
+                $oldPath = str_replace(Storage::disk('public')->url(''), '', $provider->logo_url);
+                Storage::disk('public')->delete($oldPath);
             }
-            $path    = $request->file('logo')->store('logos', ['disk' => $disk, 'visibility' => 'public']);
-            $logoUrl = Storage::disk($disk)->url($path);
+            $path    = $request->file('logo')->store('logos', ['disk' => 'public']);
+            $logoUrl = Storage::disk('public')->url($path);
         }
 
         if ($request->input('type') === 'logo') {
