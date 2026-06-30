@@ -34,6 +34,7 @@
 
   <form method="POST" action="{{ route('login') }}">
     @csrf
+    <input type="text" name="website" value="" autocomplete="off" tabindex="-1" style="position:absolute;left:-9999px;width:1px;height:1px;opacity:0;" aria-hidden="true">
     <div class="field">
       <label for="email">E-mail</label>
       <input type="email" id="email" name="email" value="{{ old('email') }}" autocomplete="email" autofocus required>

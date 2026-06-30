@@ -20,6 +20,10 @@ class AuthController extends Controller
 
     public function login(Request $request)
     {
+        if ($request->filled('website')) {
+            return back()->withErrors(['email' => 'E-mail ou senha incorretos.'])->onlyInput('email');
+        }
+
         $credentials = $request->validate([
             'email'    => 'required|email',
             'password' => 'required',
