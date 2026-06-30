@@ -66,7 +66,7 @@
 <div style="background:#fafaf8; border:1px solid #ece9e4; border-radius:10px; padding:14px 20px; margin-bottom:24px; display:flex; align-items:center; gap:12px;">
   <svg width="16" height="16" fill="none" stroke="#aaa" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
   <span style="font-size:13px; color:#888;">Sua página:</span>
-  <a href="{{ config('app.web_url', 'http://localhost:3000') }}/operadores/{{ $provider->slug }}" target="_blank" style="font-size:13px; color:#FF2924; font-weight:500; text-decoration:none;">
+  <a href="{{ config('app.frontend_url') }}/operadores/{{ $provider->slug }}" target="_blank" style="font-size:13px; color:#FF2924; font-weight:500; text-decoration:none;">
     envago.live/operadores/{{ $provider->slug }}
   </a>
 </div>
