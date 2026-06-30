@@ -193,7 +193,7 @@ PROMPT;
         // Tool use loop — runs up to 5 iterations to handle chained tool calls
         for ($iteration = 0; $iteration < 10; $iteration++) {
             $payload = [
-                'model'      => 'claude-sonnet-4-6',
+                'model'      => 'claude-haiku-4-5-20251001',
                 'max_tokens' => 4096,
                 'system'     => $systemPrompt,
                 'messages'   => $messages,
