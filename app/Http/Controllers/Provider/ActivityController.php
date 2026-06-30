@@ -37,7 +37,7 @@ class ActivityController extends Controller
             'groups.*.times'    => 'required|array|min:1',
             'groups.*.times.*'  => 'date_format:H:i',
             'photos'            => 'required',
-            'photos.*'          => 'image|mimes:jpeg,png,jpg,webp|max:5120',
+            'photos.*'          => 'image|mimes:jpeg,png,jpg,webp|max:20480',
         ], [
             'name.required'             => 'O nome do passeio é obrigatório.',
             'name.max'                  => 'O nome não pode ter mais de 120 caracteres.',
@@ -59,13 +59,18 @@ class ActivityController extends Controller
             'photos.required'           => 'Adicione pelo menos uma foto para continuar.',
             'photos.*.image'            => 'Arquivo inválido. Use apenas fotos (JPG, PNG ou WebP).',
             'photos.*.mimes'            => 'Arquivo inválido. Use apenas fotos (JPG, PNG ou WebP).',
-            'photos.*.max'              => 'Uma das fotos passou de 5 MB. Reduza o tamanho e tente novamente.',
+            'photos.*.max'              => 'Uma das fotos passou de 20 MB. Reduza o tamanho e tente novamente.',
         ]);
 
         $provider = auth()->user()->provider;
         $photos   = $request->hasFile('photos') ? $request->file('photos') : [];
 
-        $activity = $this->activityService->createActivity($provider, $request->all(), $photos);
+        try {
+            $activity = $this->activityService->createActivity($provider, $request->all(), $photos);
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::error('activity.create failed', ['error' => $e->getMessage()]);
+            return response()->json(['errors' => ['photos' => ['Erro ao salvar fotos. Tente novamente.']]], 422);
+        }
 
         $scheduleCount = $activity->schedules()->count();
 
@@ -117,7 +122,7 @@ class ActivityController extends Controller
             'groups.*.days.*'   => 'integer|between:0,6',
             'groups.*.times'    => 'required|array|min:1',
             'groups.*.times.*'  => 'date_format:H:i',
-            'photos.*'          => 'image|mimes:jpeg,png,jpg,webp|max:5120',
+            'photos.*'          => 'image|mimes:jpeg,png,jpg,webp|max:20480',
             'delete_media'      => 'nullable|array',
             'delete_media.*'    => 'integer',
         ], [
@@ -134,13 +139,18 @@ class ActivityController extends Controller
             'groups.*.times.required'   => 'Adicione pelo menos um horário em cada grupo.',
             'photos.*.image'            => 'Arquivo inválido. Use apenas fotos (JPG, PNG ou WebP).',
             'photos.*.mimes'            => 'Arquivo inválido. Use apenas fotos (JPG, PNG ou WebP).',
-            'photos.*.max'              => 'Uma das fotos passou de 5 MB. Reduza o tamanho e tente novamente.',
+            'photos.*.max'              => 'Uma das fotos passou de 20 MB. Reduza o tamanho e tente novamente.',
         ]);
 
         $newPhotos      = $request->hasFile('photos') ? $request->file('photos') : [];
         $deleteMediaIds = $request->input('delete_media', []);
 
-        $this->activityService->updateActivity($activity, $request->all(), $newPhotos, $deleteMediaIds);
+        try {
+            $this->activityService->updateActivity($activity, $request->all(), $newPhotos, $deleteMediaIds);
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::error('activity.update failed', ['error' => $e->getMessage()]);
+            return response()->json(['errors' => ['photos' => ['Erro ao salvar fotos. Tente novamente.']]], 422);
+        }
 
         return response()->json([
             'redirect' => route('provider.activities'),
