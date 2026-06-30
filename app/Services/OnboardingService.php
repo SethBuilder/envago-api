@@ -51,22 +51,18 @@ class OnboardingService
                 ]);
             }
 
-            $bankDetails = $this->parseBankDetails($op['bank'] ?? null);
-
             $provider = Provider::where('user_id', $user->id)->first();
             if (!$provider) {
                 $provider = Provider::create([
                     'user_id'           => $user->id,
                     'business_name'     => $bizName,
                     'whatsapp_number'   => $op['whatsapp'] ?: null,
-                    'bank_details'      => $bankDetails,
                     'status'            => 'pending',
                     'lara_onboarded_at' => now(),
                 ]);
             } else {
                 $provider->update(array_filter([
                     'whatsapp_number'   => $op['whatsapp'] ?: null,
-                    'bank_details'      => $bankDetails ?? $provider->bank_details,
                     'lara_onboarded_at' => $provider->lara_onboarded_at ?? now(),
                 ]));
             }

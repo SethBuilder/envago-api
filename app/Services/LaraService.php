@@ -42,21 +42,18 @@ Quando tiver uma visao clara dos passeios, mostre um resumo e pergunte se pode c
 
 Antes de confirmar, certifique-se de que cada passeio tem pelo menos uma foto. Aproveite tudo que o operador já enviou — imagens, arquivos, links. Se ainda faltar, peça. Só oriente a adicionar pelo painel se não for possível obter a foto agora. Quando pedir ou buscar fotos de um passeio específico, adicione ao final da sua mensagem a tag `[PHOTO_FOR:slug-do-passeio]` onde slug é o nome do passeio em minúsculas com hifens (ex: `[PHOTO_FOR:buggy-leste-classico]`). O operador não vê esta tag — é apenas para o sistema saber a qual passeio pertencem as fotos recebidas.
 
-Em seguida, ofeca receber os dados bancarios para os repasses — nome completo do titular, CPF ou CNPJ, nome do banco, SWIFT/BIC, agencia, numero da conta e tipo (corrente ou poupanca), endereco com CEP — ou deixar para depois pelo painel.
-
 **6. Confirmacao final — CRITICO**
-Apos dados bancarios OU operador escolher preencher depois:
+Apos confirmar os passeios e fotos:
 Output APENAS o JSON abaixo, em uma unica linha continua.
 NENHUM texto antes. NENHUM texto depois. Sem markdown. Sem explicacao.
 O sistema intercepta este JSON, gera a pagina e envia a resposta ao operador automaticamente.
 
-{"action":"confirmed","business_name":"string","email":"string","whatsapp":"string or empty","city":"string","state":"2-letter UF","bank":"pendente or dados bancarios completos em texto","tours":"nome|categoria|preco|duracao_min|capacidade|dias(0-6 separados por virgula)|horarios(separados por virgula)|ponto_encontro — uma linha por passeio separadas por ponto-e-virgula"}
+{"action":"confirmed","business_name":"string","email":"string","whatsapp":"string or empty","city":"string","state":"2-letter UF","tours":"nome|categoria|preco|duracao_min|capacidade|dias(0-6 separados por virgula)|horarios(separados por virgula)|ponto_encontro — uma linha por passeio separadas por ponto-e-virgula"}
 
 Regras (restricoes do sistema):
 - city e state nao podem ser vazios.
 - "business_name": use exatamente o nome que o operador informou.
 - dias: 0=domingo,1=segunda,...,6=sabado.
-- bank: "pendente" se operador escolheu preencher depois.
 
 ## Escalonamento
 Se houver disputa, payout em falta, suspensao ou situacao que exige julgamento humano:
@@ -89,10 +86,9 @@ PROMPT;
 You are a JSON formatter for Envago. Convert the confirmed operator data below into the exact JSON schema. Output ONLY valid JSON on a single line. No text before or after. No markdown.
 
 Schema:
-{"action":"onboard","operator":{"business_name":"","email":"","whatsapp":"","city":"","state":"","bank":{"beneficiary":"","cpf_cnpj":"","bank_name":"","swift":"","branch":"","account":"","account_type":"corrente or poupanca","address":"","city":"","state":"","postcode":""}},"tours":[{"name":"","category_slug":"","category_name":"","price":0,"duration_minutes":0,"capacity":0,"schedules":[{"days":[1,2,3,4,5],"times":["08:00"]}],"description":null,"meeting_point":null,"photos":[]}]}
+{"action":"onboard","operator":{"business_name":"","email":"","whatsapp":"","city":"","state":""},"tours":[{"name":"","category_slug":"","category_name":"","price":0,"duration_minutes":0,"capacity":0,"schedules":[{"days":[1,2,3,4,5],"times":["08:00"]}],"description":null,"meeting_point":null,"photos":[]}]}
 
 Rules:
-- Omit "bank" object if bank value is "pendente".
 - days: integers 0=Sunday,1=Monday,...,6=Saturday.
 - category_slug: lowercase slug. category_name: display name in Portuguese.
 - photos: array of filenames. Empty array if none.
@@ -106,7 +102,6 @@ PROMPT;
         $summary .= "WHATSAPP: {$confirmed['whatsapp']}\n";
         $summary .= "CITY: {$confirmed['city']}\n";
         $summary .= "STATE: {$confirmed['state']}\n";
-        $summary .= "BANK: {$confirmed['bank']}\n";
         $summary .= "TOURS:\n{$confirmed['tours']}";
 
         $response = Http::timeout(90)->withHeaders([
