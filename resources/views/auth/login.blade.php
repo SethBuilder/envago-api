@@ -46,6 +46,7 @@
       @error('password')<p class="error">{{ $message }}</p>@enderror
     </div>
     <button type="submit" class="btn">Entrar</button>
+    <p style="text-align:right; margin-top:12px; font-size:13px;"><a href="{{ route('password.request') }}" style="color:#888; text-decoration:none;">Esqueceu sua senha?</a></p>
   </form>
 
   <div class="divider"><hr><span>ou</span><hr></div>
