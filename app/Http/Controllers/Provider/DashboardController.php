@@ -19,6 +19,10 @@ class DashboardController extends Controller
     {
         $provider = auth()->user()->provider;
 
+        if ($provider && !$provider->first_login_at) {
+            $provider->update(['first_login_at' => now()]);
+        }
+
         $stats = ['total' => 0, 'confirmed' => 0, 'revenue' => 0, 'pending' => 0];
         $grouped = collect();
 

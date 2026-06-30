@@ -97,9 +97,10 @@ class ParceirosController extends Controller
         );
 
         // Intercept confirmed/onboard JSON
-        $cleanReply    = preg_replace('/\s*\[PHOTO_FOR:[^\]]+\]/', '', $rawReply);
-        $confirmedData = $this->extractConfirmedJson($rawReply);
-        $onboardData   = $confirmedData ? null : $this->extractOnboardJson($rawReply);
+        $cleanReply       = preg_replace('/\s*\[PHOTO_FOR:[^\]]+\]/', '', $rawReply);
+        $confirmedData    = $this->extractConfirmedJson($rawReply);
+        $onboardData      = $confirmedData ? null : $this->extractOnboardJson($rawReply);
+        $outsideScopeData = (!$confirmedData && !$onboardData) ? $this->extractOutsideScopeJson($rawReply) : null;
 
         if ($confirmedData) {
             try {
@@ -138,6 +139,30 @@ class ParceirosController extends Controller
             } catch (\Throwable $e) {
                 Log::error('parceiros.onboard failed', ['error' => $e->getMessage()]);
                 $cleanReply = 'Ocorreu um erro ao criar sua página. Nossa equipe foi notificada — tente novamente em alguns minutos.';
+            }
+        } elseif ($outsideScopeData) {
+            // Strip the JSON from cleanReply — show only Lara's conversational text
+            $jsonPos = strpos($cleanReply, '{"action":"outside_scope"');
+            if ($jsonPos !== false) {
+                $cleanReply = trim(substr($cleanReply, 0, $jsonPos));
+            }
+            if (empty($cleanReply)) {
+                $cleanReply = 'Obrigada pelas informações. Guardei seus dados e entraremos em contato quando o Envago expandir para esse segmento.';
+            }
+            $leadId = DB::table('scope_leads')->insertGetId([
+                'session_id'    => $sessionId,
+                'business_name' => $outsideScopeData['business_name'] ?? null,
+                'location'      => $outsideScopeData['location'] ?? null,
+                'offering'      => $outsideScopeData['offering'] ?? '',
+                'price_range'   => $outsideScopeData['price_range'] ?? null,
+                'whatsapp'      => $outsideScopeData['whatsapp'] ?? null,
+                'summary'       => $outsideScopeData['summary'] ?? '',
+                'created_at'    => now(),
+                'updated_at'    => now(),
+            ]);
+            $photos = $this->moveScopeLeadPhotos($sessionId, $leadId);
+            if ($photos) {
+                DB::table('scope_leads')->where('id', $leadId)->update(['photos' => json_encode($photos)]);
             }
         } elseif (!$confirmedData && str_contains($rawReply, '"action":"misuse"')) {
             $this->notifyAdminsMisuse($rawReply, $sessionId, $request->ip());
@@ -319,6 +344,42 @@ class ParceirosController extends Controller
             Log::warning('parceiros: spreadsheet parse failed', ['error' => $e->getMessage()]);
             return '[Não foi possível ler o arquivo. Solicite ao operador que cole os dados manualmente.]';
         }
+    }
+
+    private function moveScopeLeadPhotos(string $sessionId, int $leadId): array
+    {
+        $disk  = config('filesystems.default') === 's3' ? 's3' : 'public';
+        $files = Storage::disk('local')->files("temp/{$sessionId}");
+        $urls  = [];
+
+        foreach ($files as $file) {
+            $ext = strtolower(pathinfo($file, PATHINFO_EXTENSION));
+            if (!in_array($ext, ['jpg', 'jpeg', 'png', 'webp', 'gif'])) continue;
+
+            $dest    = "scope_leads/{$leadId}/" . basename($file);
+            $content = Storage::disk('local')->get($file);
+            Storage::disk($disk)->put($dest, $content, 'public');
+            $urls[] = Storage::disk($disk)->url($dest);
+        }
+
+        return $urls;
+    }
+
+    private function extractOutsideScopeJson(string $reply): ?array
+    {
+        $stripped = preg_replace('/```json\s*|\s*```/', '', $reply);
+        $pos      = strpos($stripped, '{"action":"outside_scope"');
+        if ($pos === false) return null;
+
+        $candidate = substr($stripped, $pos);
+        for ($i = strlen($candidate); $i > 0; $i--) {
+            if ($candidate[$i - 1] !== '}') continue;
+            $data = json_decode(substr($candidate, 0, $i), true);
+            if (is_array($data) && ($data['action'] ?? '') === 'outside_scope') {
+                return $data;
+            }
+        }
+        return null;
     }
 
     private function extractConfirmedJson(string $reply): ?array

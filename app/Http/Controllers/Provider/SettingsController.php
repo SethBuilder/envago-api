@@ -45,6 +45,16 @@ class SettingsController extends Controller
             $logoUrl = Storage::disk($disk)->url($path);
         }
 
+        if ($request->input('type') === 'logo') {
+            $provider->update(['logo_url' => $logoUrl]);
+            return back()->with('success', 'Logo salvo.');
+        }
+
+        if ($request->input('type') === 'whatsapp') {
+            $provider->update(['whatsapp_number' => $request->whatsapp_number]);
+            return back()->with('success', 'WhatsApp salvo.');
+        }
+
         $bankDetails = array_filter([
             'beneficiary'  => $request->bank_beneficiary,
             'cpf_cnpj'     => $request->bank_cpf_cnpj,
@@ -61,9 +71,8 @@ class SettingsController extends Controller
         ]);
 
         $provider->update([
-            'logo_url'        => $logoUrl,
-            'whatsapp_number' => $request->whatsapp_number,
-            'bank_details'    => !empty($bankDetails) ? $bankDetails : $provider->bank_details,
+            'logo_url'     => $logoUrl,
+            'bank_details' => !empty($bankDetails) ? $bankDetails : $provider->bank_details,
         ]);
 
         return back()->with('success', 'Configurações salvas.');

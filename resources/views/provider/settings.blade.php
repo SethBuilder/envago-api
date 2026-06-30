@@ -20,12 +20,12 @@
 .field-input {
   width: 100%; padding: 9px 12px;
   border: 1px solid #ddd; border-radius: 8px;
-  font-size: 14px; font-family: inherit; color: #111;
+  font-size: 14px; font-family: inherit;
   background: #fafafa; outline: none; box-sizing: border-box;
   transition: border-color .15s, background .15s, box-shadow .15s;
 }
-.field-input:disabled { color: #111; -webkit-text-fill-color: #111; cursor: default; }
-.field-input:not(:disabled) { background: #fff; }
+.field-input:disabled { cursor: default; }
+.field-input:not(:disabled) { color: #111; background: #fff; }
 .field-input:not(:disabled):focus { border-color: #111; box-shadow: 0 0 0 3px rgba(0,0,0,.06); }
 .field-col2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
 .field-col3-1 { display: grid; grid-template-columns: 2fr 1fr; gap: 12px; }
@@ -45,6 +45,16 @@
 .cfg-btn-ghost:hover { background: #ebebeb; }
 .cfg-btn-edit { background: #111; color: #fff; width: 100%; justify-content: center; padding: 11px 18px; }
 .cfg-btn-edit:hover { opacity: .85; }
+
+/* Bank empty state */
+.bank-empty {
+  display: flex; align-items: center; gap: 14px;
+  padding: 18px 0; color: #999; font-size: 13px;
+}
+.bank-empty-icon {
+  width: 36px; height: 36px; border-radius: 8px; background: #f4f4f4;
+  display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+}
 </style>
 @endpush
 
@@ -70,9 +80,10 @@
 
 <div class="settings-wrap">
 
-  {{-- Logo (separate form so it can submit independently) --}}
-  <form method="POST" action="{{ route('provider.settings.update') }}" id="logo-form" enctype="multipart/form-data">
-    @csrf @method('PUT')
+  {{-- Logo (separate form, submits via AJAX so main form state is unaffected) --}}
+  <form id="logo-form" enctype="multipart/form-data">
+    @csrf
+    <input type="hidden" name="type" value="logo">
     <div class="cfg-section">
       <div class="cfg-section-head">
         <div class="cfg-section-title">Logo</div>
@@ -94,7 +105,7 @@
               <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
               Escolher imagem
             </button>
-            <button type="submit" id="logo-save-btn" class="cfg-btn cfg-btn-primary" style="display:none;flex:none;">
+            <button type="button" id="logo-save-btn" onclick="submitLogo()" class="cfg-btn cfg-btn-primary" style="display:none;flex:none;">
               Salvar logo
             </button>
             <button type="button" id="logo-cancel-btn" onclick="cancelLogo()" class="cfg-btn cfg-btn-ghost" style="display:none;">
@@ -103,29 +114,45 @@
           </div>
           <p id="logo-hint" style="font-size:12px;color:#aaa;margin-top:6px;">PNG ou JPG · máx. 2 MB</p>
           <p id="logo-filename" style="display:none;font-size:12px;color:#666;margin-top:6px;"></p>
+          <p id="logo-status" style="display:none;font-size:12px;margin-top:6px;"></p>
         </div>
       </div>
     </div>
   </form>
 
-  {{-- Main settings form --}}
-  <form method="POST" action="{{ route('provider.settings.update') }}" id="settings-form">
-    @csrf @method('PUT')
-
-    {{-- Contact --}}
+  {{-- WhatsApp (own AJAX form) --}}
+  <form id="wa-form">
+    @csrf
+    <input type="hidden" name="type" value="whatsapp">
     <div class="cfg-section">
-      <div class="cfg-section-head">
-        <div class="cfg-section-title">Contato</div>
+      <div class="cfg-section-head" style="display:flex;align-items:flex-start;justify-content:space-between;">
+        <div>
+          <div class="cfg-section-title">Contato</div>
+        </div>
+        <button type="button" id="wa-edit-btn" onclick="enableWa()" class="cfg-btn cfg-btn-ghost" style="padding:6px 12px;font-size:12px;margin-top:2px;">
+          <svg width="12" height="12" fill="none" viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          Editar
+        </button>
       </div>
       <div class="cfg-divider"></div>
       <div class="cfg-body">
         <div class="field-group">
           <label class="field-label">WhatsApp</label>
-          <input type="text" name="whatsapp_number" value="{{ old('whatsapp_number', $provider?->whatsapp_number) }}"
-            placeholder="+55 88 99999-9999" disabled class="field-input">
+          <input type="tel" id="wa-input" name="whatsapp_number" value="{{ old('whatsapp_number', $provider?->whatsapp_number) }}"
+            placeholder="(88) 99999-9999" disabled class="field-input">
         </div>
+        <div id="wa-actions" style="display:none;flex-direction:row;gap:8px;">
+          <button type="button" onclick="cancelWa()" class="cfg-btn cfg-btn-ghost">Cancelar</button>
+          <button type="button" onclick="submitWa()" class="cfg-btn cfg-btn-primary">Salvar</button>
+        </div>
+        <p id="wa-status" style="display:none;font-size:12px;margin-top:2px;"></p>
       </div>
     </div>
+  </form>
+
+  {{-- Bank details form --}}
+  <form method="POST" action="{{ route('provider.settings.update') }}" id="settings-form">
+    @csrf @method('PUT')
 
     {{-- Bank details --}}
     <div class="cfg-section">
@@ -134,14 +161,32 @@
           <div class="cfg-section-title">Dados bancários</div>
           <div class="cfg-section-desc">Para receber repasses via transferência bancária</div>
         </div>
-        @if(!empty($bank))
-          <span class="badge badge-confirmed" style="font-size:11px;margin-top:2px;">✓ Cadastrado</span>
-        @else
-          <span class="badge badge-pending" style="font-size:11px;margin-top:2px;">Pendente</span>
-        @endif
+        <div style="display:flex;align-items:center;gap:8px;margin-top:2px;">
+          @if(!empty($bank))
+            <span class="badge badge-confirmed" style="font-size:11px;">✓ Cadastrado</span>
+          @endif
+          <button type="button" id="bank-edit-btn" onclick="enableEdit()" class="cfg-btn cfg-btn-ghost" style="padding:6px 12px;font-size:12px;">
+            <svg width="12" height="12" fill="none" viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            Editar
+          </button>
+        </div>
       </div>
       <div class="cfg-divider"></div>
-      <div class="cfg-body">
+
+      {{-- Empty state shown when no bank data and not editing --}}
+      @if(empty($bank))
+      <div id="bank-empty" class="cfg-body" style="padding-bottom:20px;">
+        <div class="bank-empty">
+          <div class="bank-empty-icon">
+            <svg width="18" height="18" fill="none" stroke="#bbb" stroke-width="1.5" viewBox="0 0 24 24"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/></svg>
+          </div>
+          <span>Nenhum dado bancário cadastrado. Clique em <strong>Editar</strong> para adicionar.</span>
+        </div>
+      </div>
+      @endif
+
+      {{-- Fields — always in DOM, hidden when empty and not editing --}}
+      <div id="bank-fields" class="cfg-body" @if(empty($bank)) style="display:none;" @endif>
 
         <div class="field-group">
           <label class="field-label">Nome do beneficiário</label>
@@ -218,21 +263,14 @@
           </div>
           <div class="field-group">
             <label class="field-label">País</label>
-            <input type="text" value="Brasil" disabled data-always-disabled class="field-input" style="color:#aaa;-webkit-text-fill-color:#aaa;">
+            <input type="text" value="Brasil" disabled data-always-disabled class="field-input">
           </div>
         </div>
 
       </div>
     </div>
 
-    {{-- Action bar --}}
-    <div id="bar-view" class="cfg-actions" style="padding-left:0;padding-right:0;">
-      <button type="button" onclick="enableEdit()" class="cfg-btn cfg-btn-edit">
-        <svg width="15" height="15" fill="none" viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
-        Editar informações
-      </button>
-    </div>
-
+    {{-- Action bar — only visible when editing --}}
     <div id="bar-edit" class="cfg-actions" style="display:none;padding-left:0;padding-right:0;">
       <button type="button" onclick="cancelEdit()" class="cfg-btn cfg-btn-ghost">
         Cancelar
@@ -248,7 +286,9 @@
 
 <script>
 const originalValues = {};
+const bankIsEmpty = {{ empty($bank) ? 'true' : 'false' }};
 
+// ── Logo (AJAX, no page reload) ────────────────────────────
 function onLogoSelected(input) {
   if (!input.files[0]) return;
   const reader = new FileReader();
@@ -262,6 +302,7 @@ function onLogoSelected(input) {
   document.getElementById('logo-hint').style.display = 'none';
   document.getElementById('logo-save-btn').style.display = 'inline-flex';
   document.getElementById('logo-cancel-btn').style.display = 'inline-flex';
+  document.getElementById('logo-status').style.display = 'none';
 }
 
 function cancelLogo() {
@@ -269,6 +310,7 @@ function cancelLogo() {
   document.getElementById('logo-save-btn').style.display = 'none';
   document.getElementById('logo-cancel-btn').style.display = 'none';
   document.getElementById('logo-filename').style.display = 'none';
+  document.getElementById('logo-status').style.display = 'none';
   document.getElementById('logo-hint').style.display = 'block';
   @if($provider?->logo_url)
   document.getElementById('logo-preview').innerHTML =
@@ -279,13 +321,107 @@ function cancelLogo() {
   @endif
 }
 
+async function submitLogo() {
+  const btn = document.getElementById('logo-save-btn');
+  const status = document.getElementById('logo-status');
+  btn.disabled = true;
+  btn.textContent = 'Salvando…';
+
+  const form = document.getElementById('logo-form');
+  const data = new FormData(form);
+  data.append('_method', 'PUT');
+
+  try {
+    const res = await fetch('{{ route('provider.settings.update') }}', {
+      method: 'POST',
+      headers: { 'X-CSRF-TOKEN': document.querySelector('#logo-form [name=_token]').value },
+      body: data,
+    });
+    if (res.ok) {
+      status.textContent = '✓ Logo salvo';
+      status.style.color = '#22c55e';
+      status.style.display = 'block';
+      document.getElementById('logo-save-btn').style.display = 'none';
+      document.getElementById('logo-cancel-btn').style.display = 'none';
+      document.getElementById('logo-filename').style.display = 'none';
+      document.getElementById('logo-hint').style.display = 'block';
+      document.getElementById('logo-input').value = '';
+    } else {
+      throw new Error();
+    }
+  } catch {
+    status.textContent = 'Erro ao salvar. Tente novamente.';
+    status.style.color = '#c62828';
+    status.style.display = 'block';
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Salvar logo';
+  }
+}
+
+// ── WhatsApp ───────────────────────────────────────────────
+let waOriginal = '';
+
+function enableWa() {
+  waOriginal = document.getElementById('wa-input').value;
+  document.getElementById('wa-input').disabled = false;
+  document.getElementById('wa-input').focus();
+  document.getElementById('wa-edit-btn').style.display = 'none';
+  document.getElementById('wa-actions').style.display = 'flex';
+  document.getElementById('wa-status').style.display = 'none';
+}
+
+function cancelWa() {
+  document.getElementById('wa-input').value = waOriginal;
+  document.getElementById('wa-input').disabled = true;
+  document.getElementById('wa-edit-btn').style.display = 'inline-flex';
+  document.getElementById('wa-actions').style.display = 'none';
+  document.getElementById('wa-status').style.display = 'none';
+}
+
+async function submitWa() {
+  const btn = document.querySelector('#wa-actions .cfg-btn-primary');
+  const status = document.getElementById('wa-status');
+  btn.disabled = true; btn.textContent = 'Salvando…';
+
+  const data = new FormData(document.getElementById('wa-form'));
+  data.append('_method', 'PUT');
+
+  try {
+    const res = await fetch('{{ route('provider.settings.update') }}', {
+      method: 'POST',
+      headers: { 'X-CSRF-TOKEN': document.querySelector('#wa-form [name=_token]').value },
+      body: data,
+    });
+    if (res.ok) {
+      status.textContent = '✓ Salvo';
+      status.style.color = '#22c55e';
+      status.style.display = 'block';
+      document.getElementById('wa-input').disabled = true;
+      document.getElementById('wa-edit-btn').style.display = 'inline-flex';
+      document.getElementById('wa-actions').style.display = 'none';
+    } else { throw new Error(); }
+  } catch {
+    status.textContent = 'Erro ao salvar.';
+    status.style.color = '#c62828';
+    status.style.display = 'block';
+  } finally {
+    btn.disabled = false; btn.textContent = 'Salvar';
+  }
+}
+
+// ── Bank details edit/cancel ───────────────────────────────
 function enableEdit() {
   document.querySelectorAll('#settings-form .field-input').forEach(el => {
     const key = el.getAttribute('name');
     if (key) originalValues[key] = el.value;
     if (!el.dataset.alwaysDisabled) el.disabled = false;
   });
-  document.getElementById('bar-view').style.display = 'none';
+  if (bankIsEmpty) {
+    document.getElementById('bank-empty').style.display = 'none';
+    document.getElementById('bank-fields').style.display = 'flex';
+  }
+  document.getElementById('bank-edit-btn').style.display = 'none';
   document.getElementById('bar-edit').style.display = 'flex';
 }
 
@@ -295,7 +431,11 @@ function cancelEdit() {
     if (key && originalValues[key] !== undefined) el.value = originalValues[key];
     if (!el.dataset.alwaysDisabled) el.disabled = true;
   });
-  document.getElementById('bar-view').style.display = 'flex';
+  if (bankIsEmpty) {
+    document.getElementById('bank-empty').style.display = 'flex';
+    document.getElementById('bank-fields').style.display = 'none';
+  }
+  document.getElementById('bank-edit-btn').style.display = 'inline-flex';
   document.getElementById('bar-edit').style.display = 'none';
 }
 

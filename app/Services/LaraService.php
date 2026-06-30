@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 
@@ -62,6 +63,20 @@ Se houver disputa, payout em falta, suspensao ou situacao que exige julgamento h
 1. Diga: "Entendi. Escalei a sua questao para o nosso gestor, que entrara em contato pelo seu e-mail em ate 1 dia util."
 2. Na linha seguinte, output APENAS:
 {"action":"escalate","summary":"[1-2 sentence summary in English]"}
+
+## Fora do escopo
+Se o operador oferece algo que nao e passeio ou experiencia de viagem (ex: hotel, pousada, restaurante, aluguel de carro, spa, academia), NAO encerre imediatamente — ainda e valioso mapear essa demanda.
+
+Fluxo obrigatorio antes de encerrar:
+1. Explique com simpatia que o Envago foca em passeios no momento mas esta crescendo.
+2. Diga que gostaria de guardar o contato para quando expandir para o segmento deles.
+3. Colete em turnos naturais: nome do negocio, endereco completo (rua, numero, bairro, cidade, estado), o que oferecem, preco medio, WhatsApp, email e uma foto do espaco ou negocio se possivel.
+4. So apos coletar esses dados, encerre com o JSON abaixo.
+
+O campo "summary" deve conter tudo que foi coletado em texto corrido em ingles: nome, cidade, servico, preco, WhatsApp, email e qualquer outro detalhe relevante.
+
+IMPORTANTE: voce DEVE escrever uma mensagem de despedida calorosa ao operador ANTES do JSON. Nunca output o JSON sem texto antes. Na linha seguinte ao texto, output APENAS:
+{"action":"outside_scope","business_name":"string","location":"cidade, UF","offering":"descricao do que oferecem","price_range":"preco ou null","whatsapp":"numero ou null","summary":"all collected details in English: name, city, offering, price, whatsapp, email, any other relevant info"}
 
 ## Uso indevido
 Se ficar evidente que a pessoa nao e um operador de passeios e esta usando este canal de forma abusiva ou maliciosa:
@@ -132,6 +147,147 @@ PROMPT;
         ],
     ];
 
+    private string $adminSystemPrompt = <<<'PROMPT'
+You are "Lara", the admin AI assistant for Envago, a tour marketplace for Brazil.
+You are speaking with Seif Elmughrabi, the founder and CEO.
+
+## Language
+Respond in the same language the user writes to you. Switch naturally between English and Portuguese.
+
+## Your role
+Strategic thinking partner and operational assistant. Help Seif understand:
+- Business performance: bookings, revenue, growth trends
+- What operators are asking Lara during onboarding (common issues, knowledge gaps)
+- Market intelligence from outside-scope leads (services not yet covered by Envago)
+- Operational issues: pending approvals, missing bank details, payout status
+- How Lara should respond to providers and tourists via save_instruction
+
+## Tools
+You have database access tools. When answering questions that require data, ALWAYS call the appropriate tool first — never guess or invent numbers. After getting results, synthesize them into a clear, insightful answer. Highlight patterns and anomalies, not just raw data.
+
+## Instructions management
+When Seif says "when providers ask about X, say Y" or "tell Lara to always say Z":
+1. Confirm you understood
+2. Call save_instruction immediately
+3. Confirm it is saved
+
+To see or manage existing instructions, use list_instructions or delete_instruction.
+
+## Tone
+Concise, professional, insightful. Lead with the insight, follow with the data.
+PROMPT;
+
+    private array $adminTools = [
+        [
+            'name'         => 'query_providers',
+            'description'  => 'Query providers from the database. Returns business name, status, city, bank details status, created date.',
+            'input_schema' => [
+                'type'       => 'object',
+                'properties' => [
+                    'status' => ['type' => 'string', 'description' => 'Filter by status: pending, approved, rejected. Omit for all.'],
+                    'city'   => ['type' => 'string', 'description' => 'Filter by city (partial match)'],
+                    'limit'  => ['type' => 'integer', 'description' => 'Max results (default 20)'],
+                ],
+            ],
+        ],
+        [
+            'name'         => 'query_bookings',
+            'description'  => 'Query booking and revenue statistics.',
+            'input_schema' => [
+                'type'       => 'object',
+                'properties' => [
+                    'period'      => ['type' => 'string', 'description' => 'Time period: today, week, month, all (default: all)'],
+                    'provider_id' => ['type' => 'integer', 'description' => 'Filter by specific provider ID'],
+                ],
+            ],
+        ],
+        [
+            'name'         => 'query_scope_leads',
+            'description'  => 'Query leads from operators whose offering is outside Envago current scope.',
+            'input_schema' => [
+                'type'       => 'object',
+                'properties' => [
+                    'limit'    => ['type' => 'integer', 'description' => 'Max results (default 20)'],
+                    'offering' => ['type' => 'string', 'description' => 'Filter by offering type (partial match)'],
+                ],
+            ],
+        ],
+        [
+            'name'         => 'search_conversations',
+            'description'  => 'Search Lara provider onboarding conversations for specific topics or keywords.',
+            'input_schema' => [
+                'type'       => 'object',
+                'properties' => [
+                    'query' => ['type' => 'string', 'description' => 'Keyword or phrase to search in conversation messages'],
+                    'role'  => ['type' => 'string', 'description' => 'Filter by role: user, assistant, or both (default: both)'],
+                    'limit' => ['type' => 'integer', 'description' => 'Max results (default 10)'],
+                ],
+                'required' => ['query'],
+            ],
+        ],
+        [
+            'name'         => 'query_activities',
+            'description'  => 'Query activities/tours listed on Envago.',
+            'input_schema' => [
+                'type'       => 'object',
+                'properties' => [
+                    'city'        => ['type' => 'string', 'description' => 'Filter by city'],
+                    'category'    => ['type' => 'string', 'description' => 'Filter by category slug'],
+                    'provider_id' => ['type' => 'integer', 'description' => 'Filter by provider ID'],
+                    'limit'       => ['type' => 'integer', 'description' => 'Max results (default 20)'],
+                ],
+            ],
+        ],
+        [
+            'name'         => 'save_instruction',
+            'description'  => 'Save a persistent instruction that Lara will follow when talking to providers or tourists.',
+            'input_schema' => [
+                'type'       => 'object',
+                'properties' => [
+                    'context'     => ['type' => 'string', 'description' => 'Who this applies to: provider or tourist'],
+                    'instruction' => ['type' => 'string', 'description' => 'The instruction. Be specific about the trigger situation and the desired response.'],
+                ],
+                'required' => ['context', 'instruction'],
+            ],
+        ],
+        [
+            'name'         => 'list_instructions',
+            'description'  => 'List all current Lara instructions.',
+            'input_schema' => [
+                'type'       => 'object',
+                'properties' => [
+                    'context' => ['type' => 'string', 'description' => 'Filter by context: provider or tourist. Omit for all.'],
+                    'active'  => ['type' => 'boolean', 'description' => 'Filter by active status. Omit for all.'],
+                ],
+            ],
+        ],
+        [
+            'name'         => 'delete_instruction',
+            'description'  => 'Deactivate or permanently delete a Lara instruction by ID.',
+            'input_schema' => [
+                'type'       => 'object',
+                'properties' => [
+                    'id'        => ['type' => 'integer', 'description' => 'The instruction ID'],
+                    'permanent' => ['type' => 'boolean', 'description' => 'If true, permanently delete. If false (default), just deactivate.'],
+                ],
+                'required' => ['id'],
+            ],
+        ],
+    ];
+
+    private function loadActiveInstructions(string $context): string
+    {
+        $rows = DB::table('lara_instructions')
+            ->where('context', $context)
+            ->where('active', true)
+            ->orderBy('id')
+            ->pluck('instruction');
+
+        if ($rows->isEmpty()) return '';
+
+        return $rows->values()->map(fn($inst, $i) => ($i + 1) . '. ' . $inst)->join("\n");
+    }
+
     private function parceirosOpening(): string
     {
         return "Olá. Bem-vindo ao Envago — a plataforma onde turistas encontram e reservam passeios no Brasil.\n\nCriamos sua página gratuitamente e cuidamos dos anúncios no Google e Instagram para trazer os turistas até você.\n\nPara começar, me manda a lista de passeios que você oferece com os preços. Pode ser planilha, foto, PDF ou digita aqui mesmo.";
@@ -183,14 +339,26 @@ PROMPT;
             array_shift($messages);
         }
 
-        $systemPrompt = $this->systemPrompt;
-        if ($providerInfo) {
-            $systemPrompt = "## Logged-in Provider Context\nYou are speaking with an already registered operator in their private dashboard. Do NOT pitch Envago or ask them to sign up. Help them with their existing account.\n\n{$providerInfo}\n\n" . $systemPrompt;
+        if ($context === 'admin') {
+            $systemPrompt = $this->adminSystemPrompt;
+            $tools        = $this->adminTools;
+        } else {
+            $systemPrompt = $this->systemPrompt;
+            if ($providerInfo) {
+                $systemPrompt = "## Logged-in Provider Context\nYou are speaking with an already registered operator in their private dashboard. Do NOT pitch Envago or ask them to sign up. Help them with their existing account.\n\n{$providerInfo}\n\n" . $systemPrompt;
+            }
+            if ($context === 'parceiros') {
+                $instructions = $this->loadActiveInstructions('provider');
+                if ($instructions) {
+                    $systemPrompt .= "\n\n## Instruções personalizadas do Envago\n{$instructions}";
+                }
+            }
+            $tools = $this->parceirosTools;
         }
 
-        $useTools = $context === 'parceiros' && $toolExecutor !== null;
+        $useTools = in_array($context, ['parceiros', 'admin']) && $toolExecutor !== null;
 
-        // Tool use loop — runs up to 5 iterations to handle chained tool calls
+        // Tool use loop — runs up to 10 iterations to handle chained tool calls
         for ($iteration = 0; $iteration < 10; $iteration++) {
             $payload = [
                 'model'      => 'claude-haiku-4-5-20251001',
@@ -200,7 +368,7 @@ PROMPT;
             ];
 
             if ($useTools) {
-                $payload['tools'] = $this->parceirosTools;
+                $payload['tools'] = $tools;
             }
 
             $response = Http::timeout(90)->withHeaders([

@@ -2,11 +2,14 @@
 
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\AuthController;
-use App\Http\Controllers\ChatController;
 use App\Http\Controllers\ParceirosController;
+use App\Http\Controllers\Admin\AdminLaraController;
 use App\Http\Controllers\Admin\DashboardController as AdminDashboard;
+use App\Http\Controllers\Admin\LaraConversationsController;
+use App\Http\Controllers\Admin\LaraInstructionsController;
 use App\Http\Controllers\Admin\PayoutController as AdminPayout;
 use App\Http\Controllers\Admin\ProviderController as AdminProvider;
+use App\Http\Controllers\Admin\ScopeLeadsController;
 use App\Http\Controllers\Provider\DashboardController as ProviderDashboard;
 use App\Http\Controllers\Provider\SettingsController as ProviderSettings;
 use App\Http\Controllers\Provider\ActivityController as ProviderActivity;
@@ -42,18 +45,24 @@ Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(fun
     Route::get('/payouts',                              [AdminPayout::class, 'index'])->name('payouts');
     Route::post('/payouts/{schedule}/pay',              [AdminPayout::class, 'pay'])->name('payouts.pay');
     Route::get('/payouts/{payout}/download',            [AdminPayout::class, 'download'])->name('payouts.download');
+
+    // Lara admin
+    Route::get('/lara',                                    [AdminLaraController::class,         'show'])->name('lara.chat');
+    Route::post('/lara/message',                           [AdminLaraController::class,         'message'])->name('lara.message');
+    Route::post('/lara/reset',                             [AdminLaraController::class,         'reset'])->name('lara.reset');
+    Route::get('/lara/conversations',                      [LaraConversationsController::class, 'index'])->name('lara.conversations');
+    Route::get('/lara/conversations/{sessionId}',          [LaraConversationsController::class, 'show'])->name('lara.conversations.show');
+    Route::get('/scope-leads',                             [ScopeLeadsController::class,        'index'])->name('scope-leads');
+    Route::get('/lara-instructions',                       [LaraInstructionsController::class,  'index'])->name('lara.instructions');
+    Route::post('/lara-instructions',                      [LaraInstructionsController::class,  'store'])->name('lara.instructions.store');
+    Route::post('/lara-instructions/{instruction}/toggle', [LaraInstructionsController::class,  'toggle'])->name('lara.instructions.toggle');
+    Route::delete('/lara-instructions/{instruction}',      [LaraInstructionsController::class,  'destroy'])->name('lara.instructions.destroy');
 });
 
 // Parceiros — public provider onboarding chat
 Route::get('/parceiros',          [ParceirosController::class, 'show'])->name('parceiros');
 Route::post('/parceiros/message', [ParceirosController::class, 'message'])->name('parceiros.message')->middleware('throttle:20,1');
 
-// Lara test — admin only, at /lara
-Route::middleware(['auth', 'admin'])->group(function () {
-    Route::get('/lara',          [ChatController::class, 'show'])->name('lara.chat');
-    Route::post('/lara/message', [ChatController::class, 'message'])->name('lara.message');
-    Route::post('/lara/reset',   [ChatController::class, 'reset'])->name('lara.reset');
-});
 
 Route::post('/stop-impersonating', [AdminProvider::class, 'stopImpersonating'])->name('stop.impersonating')->middleware('auth');
 

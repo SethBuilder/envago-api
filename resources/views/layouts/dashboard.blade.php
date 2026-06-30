@@ -211,9 +211,22 @@
         <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
         Pagamentos
       </a>
-      <a href="{{ route('lara.chat') }}" class="nav-item {{ request()->routeIs('lara*') ? 'active' : '' }}">
+      <div style="padding:8px 12px 2px;font-size:10px;color:#ccc;letter-spacing:1px;text-transform:uppercase;font-weight:600;">Lara</div>
+      <a href="{{ route('admin.lara.chat') }}" class="nav-item {{ request()->routeIs('admin.lara.chat') ? 'active' : '' }}">
         <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
-        Lara (teste)
+        Chat
+      </a>
+      <a href="{{ route('admin.lara.conversations') }}" class="nav-item {{ request()->routeIs('admin.lara.conversations*') ? 'active' : '' }}">
+        <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M17 8h2a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-8a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="6" rx="1"/></svg>
+        Conversas
+      </a>
+      <a href="{{ route('admin.scope-leads') }}" class="nav-item {{ request()->routeIs('admin.scope-leads') ? 'active' : '' }}">
+        <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+        Fora do Escopo
+      </a>
+      <a href="{{ route('admin.lara.instructions') }}" class="nav-item {{ request()->routeIs('admin.lara.instructions*') ? 'active' : '' }}">
+        <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
+        Instruções
       </a>
     @else
       <a href="{{ route('provider.dashboard') }}" class="nav-item {{ request()->routeIs('provider.dashboard') ? 'active' : '' }}">

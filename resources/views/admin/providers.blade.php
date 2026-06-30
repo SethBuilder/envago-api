@@ -21,6 +21,8 @@
           <th>Negócio</th>
           <th>E-mail</th>
           <th>Cadastro</th>
+          <th>Lara</th>
+          <th>1º Login</th>
           <th>Status</th>
           <th></th>
         </tr>
@@ -32,6 +34,20 @@
           <td>{{ $provider->business_name }}</td>
           <td style="font-size:13px; color:#888;">{{ $provider->user->email }}</td>
           <td style="font-size:13px; color:#aaa;">{{ $provider->created_at->format('d/m/Y') }}</td>
+          <td style="font-size:13px; text-align:center;">
+            @if($provider->lara_onboarded_at)
+              <span style="color:#22c55e;" title="{{ $provider->lara_onboarded_at->format('d/m/Y H:i') }}">✓</span>
+            @else
+              <span style="color:#ddd;">—</span>
+            @endif
+          </td>
+          <td style="font-size:13px; color:#aaa;">
+            @if($provider->first_login_at)
+              <span title="{{ $provider->first_login_at->format('d/m/Y H:i') }}">{{ $provider->first_login_at->format('d/m/Y') }}</span>
+            @else
+              <span style="color:#ddd;">—</span>
+            @endif
+          </td>
           <td><span class="badge badge-{{ $provider->status }}">
             {{ match($provider->status) { 'pending' => 'Pendente', 'approved' => 'Aprovado', 'rejected' => 'Rejeitado', default => $provider->status } }}
           </span></td>
