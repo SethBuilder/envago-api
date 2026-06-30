@@ -329,15 +329,10 @@ class AdminLaraController extends Controller
     {
         $token     = env('FACEBOOK_ACCESS_TOKEN');
         $accountId = env('FACEBOOK_AD_ACCOUNT_ID'); // already act_xxx
+        $pageId    = env('FACEBOOK_PAGE_ID');
         $base      = 'https://graph.facebook.com/v21.0';
 
-        // Get Facebook Page ID
-        $pagesRes = Http::timeout(15)->get("{$base}/me/accounts", ['access_token' => $token]);
-        $pageId   = $pagesRes->json('data.0.id');
-        if (!$pageId) {
-            Log::error('admin_lara: could not fetch page ID', ['body' => substr($pagesRes->body(), 0, 300)]);
-            return 'Error: could not fetch Facebook Page ID.';
-        }
+        if (!$pageId) return 'Error: FACEBOOK_PAGE_ID not configured.';
 
         // Upload image from URL to Meta
         $imgRes   = Http::timeout(30)->post("{$base}/{$accountId}/adimages", [
