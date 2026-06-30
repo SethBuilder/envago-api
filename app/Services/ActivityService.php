@@ -167,25 +167,25 @@ class ActivityService
     {
         if (empty($photos)) return;
 
-        $disk     = config('filesystems.default') === 's3' ? 's3' : 'public';
         $order    = ($activity->media()->max('order') ?? -1) + 1;
         $hasCover = $activity->media()->where('type', 'cover')->exists();
 
-        $nameSlug  = Str::slug($activity->name);
-        $citySlug  = Str::slug($activity->city);
-        $stateSlug = strtolower($activity->state);
+        $providerSlug = Str::slug($activity->provider->business_name ?? '');
+        $nameSlug     = Str::slug($activity->name);
+        $citySlug     = Str::slug($activity->city);
+        $stateSlug    = strtolower($activity->state);
 
         foreach ($photos as $photo) {
-            $seoName = "{$nameSlug}-{$citySlug}-{$stateSlug}-{$order}";
+            $seoName = "{$providerSlug}-{$nameSlug}-{$citySlug}-{$stateSlug}-{$order}";
 
             if ($photo instanceof UploadedFile) {
                 $ext  = strtolower($photo->getClientOriginalExtension()) ?: 'jpg';
-                $path = $photo->storeAs('activities/' . $activity->id, "{$seoName}.{$ext}", ['disk' => $disk, 'visibility' => 'public']);
+                $path = $photo->storeAs('activities/' . $activity->id, "{$seoName}.{$ext}", ['disk' => 'public', 'visibility' => 'public']);
             } else {
                 // Absolute path to temp file — move to permanent storage with SEO name
                 $ext  = strtolower(pathinfo($photo, PATHINFO_EXTENSION)) ?: 'jpg';
                 $dest = 'activities/' . $activity->id . '/' . "{$seoName}.{$ext}";
-                Storage::disk($disk)->put($dest, file_get_contents($photo), 'public');
+                Storage::disk('public')->put($dest, file_get_contents($photo), 'public');
                 $path = $dest;
             }
 
