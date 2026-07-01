@@ -46,6 +46,7 @@ Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(fun
     Route::post('/providers/{provider}/approve',          [AdminProvider::class, 'approve'])->name('providers.approve');
     Route::post('/providers/{provider}/reject',           [AdminProvider::class, 'reject'])->name('providers.reject');
     Route::post('/providers/{provider}/impersonate',      [AdminProvider::class, 'impersonate'])->name('providers.impersonate');
+    Route::post('/providers/{provider}/resend-activation', [AdminProvider::class, 'resendActivation'])->name('providers.resend-activation');
     Route::get('/payouts',                              [AdminPayout::class, 'index'])->name('payouts');
     Route::post('/payouts/{schedule}/pay',              [AdminPayout::class, 'pay'])->name('payouts.pay');
     Route::get('/payouts/{payout}/download',            [AdminPayout::class, 'download'])->name('payouts.download');

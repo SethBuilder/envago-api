@@ -12,6 +12,12 @@
     {{ match($provider->status) { 'pending' => 'Pendente', 'approved' => 'Aprovado', 'rejected' => 'Rejeitado', default => $provider->status } }}
   </span>
   <div style="margin-left:auto; display:flex; gap:8px;">
+    @if(!$provider->user->email_verified_at)
+    <form method="POST" action="{{ route('admin.providers.resend-activation', $provider) }}">
+      @csrf
+      <button type="submit" class="btn btn-ghost">Reenviar email de ativação</button>
+    </form>
+    @endif
     <form method="POST" action="{{ route('admin.providers.impersonate', $provider) }}">
       @csrf
       <button type="submit" class="btn btn-ghost">Ver como operador</button>

@@ -74,4 +74,22 @@ class ProviderController extends Controller
 
         return redirect()->route('admin.dashboard');
     }
+
+    public function resendActivation(Provider $provider)
+    {
+        $user = $provider->user;
+
+        if ($user->email_verified_at) {
+            return back()->with('success', "Conta já verificada — nenhum e-mail enviado.");
+        }
+
+        $user->update([
+            'activation_token'            => \Illuminate\Support\Str::random(64),
+            'activation_token_expires_at' => now()->addDays(7),
+        ]);
+
+        Mail::to($user->email)->send(new AccountActivationMail($user));
+
+        return back()->with('success', "E-mail de ativação reenviado para {$user->email}.");
+    }
 }
