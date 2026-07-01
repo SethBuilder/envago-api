@@ -132,11 +132,32 @@
           </select>
         </div>
         <div class="f-group">
-          <label class="f-label">Preço por pessoa <span style="color:#ff2924">*</span></label>
+          <label class="f-label" id="price-label">
+            {{ $activity->pricing_type === 'per_unit' ? 'Preço por unidade' : 'Preço por pessoa' }}
+            <span style="color:#ff2924">*</span>
+          </label>
           <div class="f-prefix-wrap">
             <span class="f-prefix">R$</span>
             <input type="number" name="price" value="{{ $activity->price }}"
               class="f-input" min="1" max="99999" step="1" id="f-price">
+          </div>
+          <div style="display:flex;gap:16px;margin-top:8px;">
+            <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:13px;color:#444;">
+              <input type="radio" name="pricing_type" value="per_person"
+                {{ $activity->pricing_type !== 'per_unit' ? 'checked' : '' }}
+                onchange="onPricingTypeChange(this.value)"> Por pessoa
+            </label>
+            <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:13px;color:#444;">
+              <input type="radio" name="pricing_type" value="per_unit"
+                {{ $activity->pricing_type === 'per_unit' ? 'checked' : '' }}
+                onchange="onPricingTypeChange(this.value)"> Por unidade
+            </label>
+          </div>
+          <div id="pricing-unit-wrap" style="display:{{ $activity->pricing_type === 'per_unit' ? 'block' : 'none' }};margin-top:8px;">
+            <input type="text" name="pricing_unit" class="f-input" id="f-pricing_unit"
+              value="{{ $activity->pricing_unit }}"
+              placeholder="ex: buggy, barco, cavalo" maxlength="30" autocomplete="off">
+            <span class="f-error" id="err-pricing_unit"></span>
           </div>
           <span class="f-error" id="err-price"></span>
         </div>
@@ -319,6 +340,14 @@ async function compressPhotos(files) {
 }
 </script>
 <script>
+// ── Pricing type toggle ──────────────────────────────────────
+function onPricingTypeChange(val) {
+  document.getElementById('pricing-unit-wrap').style.display = val === 'per_unit' ? 'block' : 'none';
+  document.getElementById('price-label').innerHTML = val === 'per_unit'
+    ? 'Preço por unidade <span style="color:#ff2924">*</span>'
+    : 'Preço por pessoa <span style="color:#ff2924">*</span>';
+}
+
 // ── Google Places ─────────────────────────────────────────────
 function initPlaces() {
   const input = document.getElementById('meeting-point-input');

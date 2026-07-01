@@ -34,6 +34,9 @@ class ActivityService
             $categoryId = $category->id;
         }
 
+        $pricingType = $data['pricing_type'] ?? 'per_person';
+        $pricingUnit = $pricingType === 'per_unit' ? ($data['pricing_unit'] ?? null) : null;
+
         $activity = Activity::create([
             'provider_id'       => $provider->id,
             'category_id'       => $categoryId,
@@ -41,6 +44,8 @@ class ActivityService
             'slug'              => $slug,
             'description'       => $data['description'] ?? null,
             'price'             => $data['price'],
+            'pricing_type'      => $pricingType,
+            'pricing_unit'      => $pricingUnit,
             'duration_minutes'  => $data['duration_minutes'],
             'capacity'          => $data['capacity'],
             'city'              => $data['city'],
@@ -66,11 +71,16 @@ class ActivityService
      */
     public function updateActivity(Activity $activity, array $data, array $newPhotos = [], array $deleteMediaIds = [], array $newVideos = []): Activity
     {
+        $pricingType = $data['pricing_type'] ?? $activity->pricing_type;
+        $pricingUnit = $pricingType === 'per_unit' ? ($data['pricing_unit'] ?? $activity->pricing_unit) : null;
+
         $activity->update([
             'category_id'       => $data['category_id'] ?? $activity->category_id,
             'name'              => $data['name'],
             'description'       => $data['description'] ?? null,
             'price'             => $data['price'],
+            'pricing_type'      => $pricingType,
+            'pricing_unit'      => $pricingUnit,
             'duration_minutes'  => $data['duration_minutes'],
             'capacity'          => $data['capacity'],
             'city'              => $data['city'],

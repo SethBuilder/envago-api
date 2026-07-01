@@ -8,12 +8,17 @@ class Activity extends Model
 {
     protected $fillable = [
         'provider_id', 'category_id', 'name', 'slug', 'description',
-        'price', 'duration_minutes', 'capacity', 'city', 'state',
+        'price', 'pricing_type', 'pricing_unit', 'duration_minutes', 'capacity', 'city', 'state',
         'meeting_point', 'meeting_point_lat', 'meeting_point_lng',
         'lat', 'lng', 'is_active',
     ];
 
     protected $casts = ['is_active' => 'boolean', 'price' => 'decimal:2'];
+
+    public function isPricedPerUnit(): bool
+    {
+        return $this->pricing_type === 'per_unit';
+    }
 
     public function scopePublic($query)
     {

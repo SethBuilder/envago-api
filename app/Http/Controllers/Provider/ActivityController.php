@@ -37,6 +37,8 @@ class ActivityController extends Controller
             'groups.*.days.*'   => 'integer|between:0,6',
             'groups.*.times'    => 'required|array|min:1',
             'groups.*.times.*'  => 'date_format:H:i',
+            'pricing_type'      => 'nullable|in:per_person,per_unit',
+            'pricing_unit'      => 'nullable|string|max:30|required_if:pricing_type,per_unit',
             'photos'            => 'required',
             'photos.*'          => 'image|mimes:jpeg,png,jpg,webp|max:20480',
         ], [
@@ -123,6 +125,8 @@ class ActivityController extends Controller
             'groups.*.days.*'   => 'integer|between:0,6',
             'groups.*.times'    => 'required|array|min:1',
             'groups.*.times.*'  => 'date_format:H:i',
+            'pricing_type'      => 'nullable|in:per_person,per_unit',
+            'pricing_unit'      => 'nullable|string|max:30|required_if:pricing_type,per_unit',
             'photos.*'          => 'image|mimes:jpeg,png,jpg,webp|max:20480',
             'videos.*'          => 'file|mimes:mp4,mov,webm|max:102400',
             'instagram_urls'    => 'nullable|array',
