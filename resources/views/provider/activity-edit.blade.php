@@ -65,6 +65,18 @@
 .photo-first-badge { position:absolute;bottom:4px;left:4px;background:rgba(0,0,0,.6);color:#fff;font-size:9px;font-weight:600;padding:2px 6px;border-radius:4px;letter-spacing:.3px; }
 .photo-existing-badge { position:absolute;bottom:4px;right:4px;background:rgba(0,128,0,.6);color:#fff;font-size:9px;font-weight:600;padding:2px 6px;border-radius:4px; }
 
+/* Videos */
+.video-drop { border:2px dashed #e0e0e0;border-radius:12px;padding:32px 24px;text-align:center;cursor:pointer;transition:all .2s;background:#fafafa; }
+.video-drop:hover,.video-drop.drag-over { border-color:#111;background:#fff; }
+.video-grid { display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:10px;margin-top:12px; }
+.video-thumb { position:relative;aspect-ratio:16/9;border-radius:8px;overflow:hidden;border:1px solid #e8e8e8;background:#111;display:flex;align-items:center;justify-content:center; }
+.video-thumb video,.video-thumb img { width:100%;height:100%;object-fit:cover; }
+.video-thumb-remove { position:absolute;top:4px;right:4px;width:22px;height:22px;border-radius:50%;background:rgba(0,0,0,.55);border:none;color:#fff;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:background .15s;z-index:10; }
+.video-thumb-remove:hover { background:rgba(220,38,38,.9); }
+.video-existing-badge { position:absolute;bottom:4px;right:4px;background:rgba(0,0,0,.6);color:#fff;font-size:9px;font-weight:600;padding:2px 6px;border-radius:4px; }
+.video-play-icon { position:absolute;inset:0;display:flex;align-items:center;justify-content:center;pointer-events:none; }
+.video-play-icon svg { opacity:.8; }
+
 /* Actions */
 .form-actions { display:flex;gap:10px;align-items:center;margin-top:4px; }
 .btn-submit { display:inline-flex;align-items:center;gap:8px;padding:12px 28px;border-radius:10px;border:none;background:#111;color:#fff;font-size:14px;font-weight:600;cursor:pointer;transition:opacity .15s,transform .1s;flex:1;justify-content:center; }
@@ -210,16 +222,18 @@
     </div>
   </div>
 
-  {{-- Step 3: Photos --}}
+  {{-- Step 3: Fotos e Vídeos --}}
   <div class="step-card">
     <div class="step-head">
       <div class="step-num">3</div>
-      <div><div class="step-title">Fotos</div><div class="step-desc">A primeira foto salva é a capa da página</div></div>
+      <div><div class="step-title">Fotos e Vídeos</div><div class="step-desc">A primeira foto é a capa · vídeos: MP4, MOV, WebM · máx 100 MB</div></div>
     </div>
     <div class="step-divider"></div>
     <div class="step-body">
+
+      {{-- Existing photos --}}
       <div class="photo-grid" id="existing-photo-grid">
-        @foreach($activity->media as $media)
+        @foreach($activity->media->whereIn('type', ['cover', 'gallery']) as $media)
           <div class="photo-thumb" id="em-{{ $media->id }}">
             <img src="{{ $media->url }}" alt="">
             @if($media->type === 'cover')
@@ -234,19 +248,55 @@
       </div>
       <div id="delete-media-inputs"></div>
 
-      <input type="file" name="photos[]" id="photo-input" accept="image/*" multiple style="display:none;"
-        onchange="onPhotosSelected(this)">
-      <div class="photo-drop" id="photo-drop"
-        onclick="document.getElementById('photo-input').click()"
+      {{-- Existing videos --}}
+      @if($activity->media->where('type','video')->count() > 0)
+      <div class="video-grid" id="existing-video-grid">
+        @foreach($activity->media->where('type','video') as $media)
+          <div class="video-thumb" id="em-{{ $media->id }}">
+            @if($media->poster_url)
+              <img src="{{ $media->poster_url }}" alt="">
+            @else
+              <div style="width:100%;height:100%;background:#1a1a1a;"></div>
+            @endif
+            <div class="video-play-icon">
+              <svg width="28" height="28" fill="white" viewBox="0 0 24 24"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+            </div>
+            <span class="video-existing-badge">Salvo</span>
+            <button type="button" class="video-thumb-remove" onclick="markDeleteMedia({{ $media->id }})">
+              <svg width="10" height="10" fill="none" stroke="currentColor" stroke-width="3" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+            </button>
+          </div>
+        @endforeach
+      </div>
+      @endif
+
+      {{-- Combined upload drop zone --}}
+      <input type="file" id="media-input" accept="image/*,video/mp4,video/quicktime,video/webm" multiple style="display:none;"
+        onchange="onMediaSelected(this)">
+      <div class="photo-drop" id="media-drop"
+        onclick="document.getElementById('media-input').click()"
         ondragover="event.preventDefault();this.classList.add('drag-over')"
         ondragleave="this.classList.remove('drag-over')"
-        ondrop="onPhotoDrop(event)">
+        ondrop="onMediaDrop(event)">
         <svg width="32" height="32" fill="none" stroke="#ccc" stroke-width="1.5" viewBox="0 0 24 24" style="margin:0 auto 10px;display:block;"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
-        <p style="font-size:14px;font-weight:500;color:#555;margin:0 0 4px;">Adicionar mais fotos</p>
-        <p style="font-size:12px;color:#aaa;margin:0;">JPG, PNG, WebP · máx 5 MB cada</p>
+        <p style="font-size:14px;font-weight:500;color:#555;margin:0 0 4px;">Adicionar fotos e vídeos</p>
+        <p style="font-size:12px;color:#aaa;margin:0;">JPG, PNG, WebP · MP4, MOV, WebM · máx 100 MB cada</p>
       </div>
       <div class="photo-grid" id="photo-grid"></div>
+      <div class="video-grid" id="video-grid" style="margin-top:4px;"></div>
       <span class="f-error" id="err-photos"></span>
+
+      {{-- Instagram Reels import --}}
+      <div style="border-top:1px solid #f0f0f0;padding-top:16px;margin-top:8px;">
+        <div class="f-label" style="margin-bottom:8px;">Importar fotos e vídeos do Instagram</div>
+        <div id="ig-url-list"></div>
+        <button type="button" onclick="addIgUrl()" class="add-time-btn" style="margin-top:4px;">
+          <svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+          Adicionar link
+        </button>
+        <p class="f-hint" style="margin-top:6px;">Cole o link de uma foto ou vídeo do Instagram. A mídia será importada automaticamente.</p>
+      </div>
+
     </div>
   </div>
 
@@ -299,11 +349,17 @@ function markDeleteMedia(id) {
 // ── New photo upload ──────────────────────────────────────────
 let selectedFiles = [];
 
-function onPhotosSelected(input) { addFiles([...input.files]); input.value = ''; }
-function onPhotoDrop(e) {
+function onMediaSelected(input) { routeFiles([...input.files]); input.value = ''; }
+function onMediaDrop(e) {
   e.preventDefault();
-  document.getElementById('photo-drop').classList.remove('drag-over');
-  addFiles([...e.dataTransfer.files].filter(f => f.type.startsWith('image/')));
+  document.getElementById('media-drop').classList.remove('drag-over');
+  routeFiles([...e.dataTransfer.files]);
+}
+function routeFiles(files) {
+  const imgs = files.filter(f => f.type.startsWith('image/'));
+  const vids = files.filter(f => f.type.startsWith('video/'));
+  if (imgs.length) addFiles(imgs);
+  if (vids.length) addVideoFiles(vids);
 }
 function addFiles(files) {
   files.slice(0, 8 - selectedFiles.length).forEach(file => {
@@ -328,6 +384,49 @@ function removeNewPhoto(idx) {
   selectedFiles.splice(idx, 1);
   document.getElementById('photo-grid').innerHTML = '';
   selectedFiles.forEach((f, i) => { const r = new FileReader(); r.onload = e => addThumb(i, e.target.result, f.name); r.readAsDataURL(f); });
+}
+
+// ── New video upload ──────────────────────────────────────────
+let selectedVideos = [];
+
+// ── Instagram URL inputs ───────────────────────────────────────
+function addIgUrl(val) {
+  const list = document.getElementById('ig-url-list');
+  const idx = Date.now();
+  const div = document.createElement('div');
+  div.id = 'ig-' + idx;
+  div.style.cssText = 'display:flex;gap:8px;margin-bottom:8px;';
+  div.innerHTML = `<input type="text" class="f-input" placeholder="https://www.instagram.com/reel/..." style="flex:1;" value="${val||''}">
+    <button type="button" class="time-chip-remove" onclick="document.getElementById('ig-${idx}').remove()">
+      <svg width="11" height="11" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+    </button>`;
+  list.appendChild(div);
+}
+function addVideoFiles(files) {
+  files.slice(0, 4 - selectedVideos.length).forEach(file => {
+    const idx = selectedVideos.push(file) - 1;
+    addVideoThumb(idx, file);
+  });
+}
+function addVideoThumb(idx, file) {
+  const grid = document.getElementById('video-grid');
+  const div = document.createElement('div');
+  div.className = 'video-thumb'; div.id = 'vt-' + idx;
+  const url = URL.createObjectURL(file);
+  div.innerHTML = `
+    <video src="${url}" preload="metadata" style="width:100%;height:100%;object-fit:cover;pointer-events:none;"></video>
+    <div class="video-play-icon">
+      <svg width="24" height="24" fill="white" viewBox="0 0 24 24"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+    </div>
+    <button type="button" class="video-thumb-remove" onclick="removeNewVideo(${idx})">
+      <svg width="10" height="10" fill="none" stroke="currentColor" stroke-width="3" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+    </button>`;
+  grid.appendChild(div);
+}
+function removeNewVideo(idx) {
+  selectedVideos.splice(idx, 1);
+  document.getElementById('video-grid').innerHTML = '';
+  selectedVideos.forEach((f, i) => addVideoThumb(i, f));
 }
 
 // ── Schedule groups ───────────────────────────────────────────
@@ -420,8 +519,14 @@ document.getElementById('edit-form').addEventListener('submit', async function(e
 
   const formData = new FormData(this);
   formData.delete('photos[]');
+  formData.delete('videos[]');
   const compressed = await compressPhotos(selectedFiles);
   compressed.forEach(f => formData.append('photos[]', f));
+  selectedVideos.forEach(f => formData.append('videos[]', f));
+  document.querySelectorAll('#ig-url-list input').forEach(inp => {
+    const v = inp.value.trim();
+    if (v) formData.append('instagram_urls[]', v);
+  });
 
   try {
     const res = await fetch('{{ route('provider.activities.update', $activity) }}', {

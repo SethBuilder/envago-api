@@ -12,18 +12,13 @@ class ProviderController extends Controller
     {
         $preview = $request->boolean('preview');
 
-        $query = Provider::with(['activities' => function ($q) {
+        $provider = Provider::with(['activities' => function ($q) {
                 $q->with(['cover', 'category', 'reviews'])
                   ->where('is_active', true)
                   ->orderBy('name');
             }])
-            ->where('slug', $slug);
-
-        if (!$preview) {
-            $query->where('status', 'approved');
-        }
-
-        $provider = $query->firstOrFail();
+            ->where('slug', $slug)
+            ->firstOrFail();
 
         return response()->json([
             'data' => [
@@ -31,6 +26,7 @@ class ProviderController extends Controller
                 'business_name'   => $provider->business_name,
                 'slug'            => $provider->slug,
                 'logo_url'        => $provider->logo_url,
+                'is_approved'     => $provider->status === 'approved',
                 'booking_enabled' => $provider->status === 'approved',
                 'activities'      => $provider->activities->map(fn($a) => [
                     'id'               => $a->id,

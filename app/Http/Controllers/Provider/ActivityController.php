@@ -8,6 +8,7 @@ use App\Models\Category;
 use App\Services\ActivityService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Storage;
 
 class ActivityController extends Controller
 {
@@ -123,6 +124,9 @@ class ActivityController extends Controller
             'groups.*.times'    => 'required|array|min:1',
             'groups.*.times.*'  => 'date_format:H:i',
             'photos.*'          => 'image|mimes:jpeg,png,jpg,webp|max:20480',
+            'videos.*'          => 'file|mimes:mp4,mov,webm|max:102400',
+            'instagram_urls'    => 'nullable|array',
+            'instagram_urls.*'  => 'nullable|url',
             'delete_media'      => 'nullable|array',
             'delete_media.*'    => 'integer',
         ], [
@@ -140,16 +144,37 @@ class ActivityController extends Controller
             'photos.*.image'            => 'Arquivo inválido. Use apenas fotos (JPG, PNG ou WebP).',
             'photos.*.mimes'            => 'Arquivo inválido. Use apenas fotos (JPG, PNG ou WebP).',
             'photos.*.max'              => 'Uma das fotos passou de 20 MB. Reduza o tamanho e tente novamente.',
+            'videos.*.mimes'            => 'Arquivo inválido. Use apenas vídeos (MP4, MOV ou WebM).',
+            'videos.*.max'              => 'Um dos vídeos passou de 100 MB.',
         ]);
 
         $newPhotos      = $request->hasFile('photos') ? $request->file('photos') : [];
         $deleteMediaIds = $request->input('delete_media', []);
+        $newVideos      = $request->hasFile('videos') ? $request->file('videos') : [];
+
+        $igUrls = array_filter((array) $request->input('instagram_urls', []));
+        if (!empty($igUrls)) {
+            $apify     = app(\App\Services\ApifyService::class);
+            $sessionId = 'provider-' . $provider->id;
+            foreach ($igUrls as $igUrl) {
+                $scraped = $apify->scrapeInstagramVideo(trim($igUrl));
+                if ($scraped) {
+                    $filename = $apify->downloadToTemp($scraped['video_url'], $sessionId);
+                    if ($filename) {
+                        $newVideos[] = [
+                            'path'       => Storage::disk('local')->path("temp/{$sessionId}/{$filename}"),
+                            'poster_url' => $scraped['poster_url'] ?? null,
+                        ];
+                    }
+                }
+            }
+        }
 
         try {
-            $this->activityService->updateActivity($activity, $request->all(), $newPhotos, $deleteMediaIds);
+            $this->activityService->updateActivity($activity, $request->all(), $newPhotos, $deleteMediaIds, $newVideos);
         } catch (\Throwable $e) {
             \Illuminate\Support\Facades\Log::error('activity.update failed', ['error' => $e->getMessage()]);
-            return response()->json(['errors' => ['photos' => ['Erro ao salvar fotos. Tente novamente.']]], 422);
+            return response()->json(['errors' => ['photos' => ['Erro ao salvar mídia. Tente novamente.']]], 422);
         }
 
         return response()->json([

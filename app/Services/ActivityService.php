@@ -21,7 +21,7 @@ class ActivityService
      * @param  array           $data      Validated activity fields + 'groups' for schedules + 'category_slug'/'category_name' for Lara flow
      * @param  UploadedFile[]|string[]  $photos  UploadedFile objects (dashboard) or absolute temp file paths (Lara)
      */
-    public function createActivity(Provider $provider, array $data, array $photos = []): Activity
+    public function createActivity(Provider $provider, array $data, array $photos = [], array $videos = []): Activity
     {
         $slug = $this->generateSlug($data['name']);
 
@@ -53,6 +53,7 @@ class ActivityService
 
         $this->generateSchedules($activity, $data['groups'] ?? []);
         $this->storePhotos($activity, $photos);
+        $this->storeVideos($activity, $videos);
 
         return $activity;
     }
@@ -63,7 +64,7 @@ class ActivityService
      * @param  UploadedFile[]|string[]  $newPhotos
      * @param  int[]                    $deleteMediaIds
      */
-    public function updateActivity(Activity $activity, array $data, array $newPhotos = [], array $deleteMediaIds = []): Activity
+    public function updateActivity(Activity $activity, array $data, array $newPhotos = [], array $deleteMediaIds = [], array $newVideos = []): Activity
     {
         $activity->update([
             'category_id'       => $data['category_id'] ?? $activity->category_id,
@@ -90,6 +91,7 @@ class ActivityService
         }
 
         $this->storePhotos($activity, $newPhotos);
+        $this->storeVideos($activity, $newVideos);
 
         // Regenerate future schedules — preserve slots that already have bookings
         $today = Carbon::today();
@@ -156,6 +158,49 @@ class ActivityService
 
         if ($schedules) {
             Schedule::insert($schedules);
+        }
+    }
+
+    /**
+     * Store videos and create Media records.
+     * Accepts UploadedFile objects (dashboard) or ['path' => ..., 'poster_url' => ...] arrays (Lara onboarding).
+     */
+    private function storeVideos(Activity $activity, array $videos): void
+    {
+        if (empty($videos)) return;
+
+        $order = ($activity->media()->max('order') ?? -1) + 1;
+
+        $providerSlug = Str::slug($activity->provider->business_name ?? '');
+        $nameSlug     = Str::slug($activity->name);
+        $citySlug     = Str::slug($activity->city);
+        $stateSlug    = strtolower($activity->state);
+
+        foreach ($videos as $video) {
+            $seoName   = "{$providerSlug}-{$nameSlug}-{$citySlug}-{$stateSlug}-video-{$order}";
+            $posterUrl = null;
+
+            if ($video instanceof UploadedFile) {
+                $ext  = strtolower($video->getClientOriginalExtension()) ?: 'mp4';
+                $path = $video->storeAs('activities/' . $activity->id, "{$seoName}.{$ext}", ['disk' => 'public']);
+            } elseif (is_array($video)) {
+                // From Lara onboarding: ['path' => '/abs/path/to/file.mp4', 'poster_url' => '...']
+                $ext       = strtolower(pathinfo($video['path'], PATHINFO_EXTENSION)) ?: 'mp4';
+                $dest      = 'activities/' . $activity->id . '/' . "{$seoName}.{$ext}";
+                Storage::disk('public')->put($dest, file_get_contents($video['path']));
+                $path      = $dest;
+                $posterUrl = $video['poster_url'] ?? null;
+            } else {
+                continue;
+            }
+
+            Media::create([
+                'activity_id' => $activity->id,
+                'url'         => $path,
+                'poster_url'  => $posterUrl,
+                'type'        => 'video',
+                'order'       => $order++,
+            ]);
         }
     }
 

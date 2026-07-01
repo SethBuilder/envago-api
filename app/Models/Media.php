@@ -7,7 +7,7 @@ use Illuminate\Support\Facades\Storage;
 
 class Media extends Model
 {
-    protected $fillable = ['activity_id', 'url', 'type', 'order'];
+    protected $fillable = ['activity_id', 'url', 'poster_url', 'type', 'order'];
 
     public function activity()
     {

@@ -88,10 +88,11 @@ class OnboardingService
                     'groups'           => $tour['schedules'] ?? [],
                 ];
 
-                // Resolve temp photos for this tour
+                // Resolve temp photos and videos for this tour
                 $photos = $this->resolveTempPhotos($sessionId, $tour['photos'] ?? []);
+                $videos = $this->resolveTempVideos($sessionId, $tour['videos'] ?? []);
 
-                $this->activityService->createActivity($provider, $activityData, $photos);
+                $this->activityService->createActivity($provider, $activityData, $photos, $videos);
             }
 
             // Clean up temp folder for this session
@@ -109,16 +110,11 @@ class OnboardingService
         });
     }
 
-    /**
-     * Resolve temp photo paths for a tour based on filenames from Lara JSON.
-     * Returns absolute paths to files that actually exist in temp storage.
-     */
     private function resolveTempPhotos(string $sessionId, array $filenames): array
     {
         if (empty($filenames)) return [];
 
         $paths = [];
-
         foreach ($filenames as $filename) {
             $relative = "temp/{$sessionId}/" . basename($filename);
             if (Storage::disk('local')->exists($relative)) {
@@ -127,8 +123,35 @@ class OnboardingService
                 Log::warning("onboarding: temp photo not found", ['session' => $sessionId, 'file' => $filename]);
             }
         }
-
         return $paths;
+    }
+
+    /**
+     * Resolve temp video paths + poster URLs for a tour.
+     * Returns array of ['path' => ..., 'poster_url' => ...] for each video.
+     */
+    private function resolveTempVideos(string $sessionId, array $filenames): array
+    {
+        if (empty($filenames)) return [];
+
+        $videos = [];
+        foreach ($filenames as $filename) {
+            $relative = "temp/{$sessionId}/" . basename($filename);
+            if (!Storage::disk('local')->exists($relative)) {
+                Log::warning("onboarding: temp video not found", ['session' => $sessionId, 'file' => $filename]);
+                continue;
+            }
+            $posterPath = $relative . '.poster';
+            $posterUrl  = Storage::disk('local')->exists($posterPath)
+                ? trim(Storage::disk('local')->get($posterPath))
+                : null;
+
+            $videos[] = [
+                'path'       => Storage::disk('local')->path($relative),
+                'poster_url' => $posterUrl,
+            ];
+        }
+        return $videos;
     }
 
     private function cleanTempFolder(string $sessionId): void

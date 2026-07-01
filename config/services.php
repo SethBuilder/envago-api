@@ -51,4 +51,8 @@ return [
         'places_key' => env('GOOGLE_PLACES_API_KEY'),
     ],
 
+    'apify' => [
+        'token' => env('APIFY_TOKEN'),
+    ],
+
 ];

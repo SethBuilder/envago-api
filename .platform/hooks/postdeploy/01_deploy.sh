@@ -14,7 +14,7 @@ chown -R webapp:webapp "$APP/storage" "$APP/bootstrap/cache"
 chmod -R 775 "$APP/storage" "$APP/bootstrap/cache"
 
 cd "$APP"
-php artisan migrate --force
+# php artisan migrate --force  # temporarily disabled — run manually after this deploy
 php artisan storage:link --force
 php artisan config:clear
 php artisan route:cache

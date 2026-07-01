@@ -2,11 +2,13 @@
 
 namespace App\Http\Controllers;
 
+use App\Services\ApifyService;
 use App\Services\LaraService;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Storage;
 
 class WhatsappController extends Controller
 {
@@ -67,10 +69,36 @@ class WhatsappController extends Controller
 
         set_time_limit(120);
 
+        // Detect Instagram URLs and scrape videos via Apify
+        $igVideoNotes = '';
+        preg_match_all('~https?://(?:www\.)?instagram\.com/(?:reel|p)/[A-Za-z0-9_\-]+/?~', $body, $igMatches);
+        if (!empty($igMatches[0])) {
+            $apify        = app(ApifyService::class);
+            $videoContext = $this->getVideoContext($history);
+            foreach ($igMatches[0] as $igUrl) {
+                $scraped = $apify->scrapeInstagramVideo($igUrl);
+                if ($scraped) {
+                    $filename = $apify->downloadToTemp($scraped['video_url'], $sessionId, $videoContext ?? '');
+                    if ($filename) {
+                        if ($scraped['poster_url']) {
+                            Storage::disk('local')->put("temp/{$sessionId}/{$filename}.poster", $scraped['poster_url']);
+                        }
+                        $igVideoNotes .= "\n[Vídeo do Instagram salvo: {$igUrl}]";
+                    } else {
+                        $igVideoNotes .= "\n[Não foi possível baixar o vídeo do Instagram: {$igUrl}]";
+                    }
+                } else {
+                    $igVideoNotes .= "\n[Vídeo do Instagram não encontrado ou privado: {$igUrl}]";
+                }
+            }
+        }
+
+        $messageToLara = trim($body . $igVideoNotes) ?: $body;
+
         try {
             $reply = $lara->respond(
                 $history->all(),
-                $body,
+                $messageToLara,
                 $context,
                 $providerInfo
             );
@@ -79,12 +107,35 @@ class WhatsappController extends Controller
             return $this->twiml('Algo deu errado. Tente novamente em instantes.');
         }
 
+        // Strip action JSON blocks before sending — operators must not see raw JSON in WhatsApp
+        $displayReply = $reply;
+        foreach (['{"action":"confirmed"', '{"action":"onboard"', '{"action":"outside_scope"', '{"action":"misuse"'] as $marker) {
+            $pos = strpos($displayReply, $marker);
+            if ($pos !== false) {
+                $displayReply = trim(substr($displayReply, 0, $pos));
+                break;
+            }
+        }
+        if ($displayReply === '') {
+            $displayReply = 'Entendido! Acesse painel.envago.live/parceiros para finalizar o cadastro da sua página.';
+        }
+
         DB::table('lara_conversations')->insert([
-            ['session_id' => $sessionId, 'uuid' => $sessionId, 'role' => 'user',      'message' => $body,  'created_at' => now(), 'updated_at' => now()],
-            ['session_id' => $sessionId, 'uuid' => $sessionId, 'role' => 'assistant', 'message' => $reply, 'created_at' => now(), 'updated_at' => now()],
+            ['session_id' => $sessionId, 'uuid' => $sessionId, 'role' => 'user',      'message' => $body,        'created_at' => now(), 'updated_at' => now()],
+            ['session_id' => $sessionId, 'uuid' => $sessionId, 'role' => 'assistant', 'message' => $displayReply, 'created_at' => now(), 'updated_at' => now()],
         ]);
 
-        return $this->twiml($reply);
+        return $this->twiml($displayReply);
+    }
+
+    private function getVideoContext(\Illuminate\Support\Collection $history): ?string
+    {
+        foreach ($history->where('role', 'assistant')->reverse() as $msg) {
+            if (preg_match('/\[VIDEO_FOR:([^\]]+)\]/', $msg->message, $m)) {
+                return $m[1];
+            }
+        }
+        return null;
     }
 
     private function twiml(string $message): Response

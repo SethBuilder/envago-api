@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Services\ApifyService;
 use App\Services\LaraService;
 use App\Services\OnboardingService;
 use Illuminate\Http\Request;
@@ -47,8 +48,9 @@ class ParceirosController extends Controller
         $fileBlocks  = [];
         $uploadedMsg = '';
 
-        // Extract photo context from last assistant message (Lara's [PHOTO_FOR:slug] tag)
+        // Extract media context from last assistant message (Lara's [PHOTO_FOR:slug] / [VIDEO_FOR:slug] tags)
         $photoContext = $this->getPhotoContext($history);
+        $videoContext = $this->getVideoContext($history);
 
         if ($request->hasFile('files')) {
             foreach ($request->file('files') as $file) {
@@ -85,7 +87,34 @@ class ParceirosController extends Controller
 
         $userMessage = trim($uploadedMsg . $userMessage);
 
-        $triggerMessage = $isInit ? '__init__' : ($userMessage ?: 'Olá');
+        // Detect Instagram URLs and scrape videos via Apify
+        $igVideoNotes = '';
+        if (!$isInit && $userMessage) {
+            preg_match_all('~https?://(?:www\.)?instagram\.com/(?:reel|p)/[A-Za-z0-9_\-]+/?~', $userMessage, $igMatches);
+            if (!empty($igMatches[0])) {
+                $apify = app(ApifyService::class);
+                foreach ($igMatches[0] as $igUrl) {
+                    $scraped = $apify->scrapeInstagramVideo($igUrl);
+                    if ($scraped) {
+                        $prefix   = $videoContext ?? $photoContext ?? '';
+                        $filename = $apify->downloadToTemp($scraped['video_url'], $sessionId, $prefix);
+                        if ($filename) {
+                            // Store poster URL as sidecar file if available
+                            if ($scraped['poster_url']) {
+                                Storage::disk('local')->put("temp/{$sessionId}/{$filename}.poster", $scraped['poster_url']);
+                            }
+                            $igVideoNotes .= "\n[Vídeo do Instagram salvo: {$igUrl}]";
+                        } else {
+                            $igVideoNotes .= "\n[Não foi possível baixar o vídeo do Instagram: {$igUrl}]";
+                        }
+                    } else {
+                        $igVideoNotes .= "\n[Vídeo do Instagram não encontrado ou privado: {$igUrl}]";
+                    }
+                }
+            }
+        }
+
+        $triggerMessage = $isInit ? '__init__' : (trim($userMessage . $igVideoNotes) ?: 'Olá');
 
         $rawReply = $lara->respond(
             $history->all(),
@@ -97,7 +126,9 @@ class ParceirosController extends Controller
         );
 
         // Intercept confirmed/onboard JSON
-        $cleanReply       = preg_replace('/\s*\[PHOTO_FOR:[^\]]+\]/', '', $rawReply);
+        // Strip internal tags and any action JSON from what gets stored/displayed
+        $cleanReply = preg_replace('/\s*\[(?:PHOTO|VIDEO)_FOR:[^\]]+\]/', '', $rawReply);
+        $cleanReply = preg_replace('/\s*\{"action":.*$/s', '', $cleanReply);
         $confirmedData    = $this->extractConfirmedJson($rawReply);
         $onboardData      = $confirmedData ? null : $this->extractOnboardJson($rawReply);
         $outsideScopeData = (!$confirmedData && !$onboardData) ? $this->extractOutsideScopeJson($rawReply) : null;
@@ -113,19 +144,26 @@ class ParceirosController extends Controller
             }
         }
 
-        // Post-process: assign temp photos to tours by slug prefix — no LLM involved
+        // Post-process: assign temp photos and videos to tours by slug prefix — no LLM involved
         if ($onboardData) {
-            $tempFileMap = $this->listTempFiles($sessionId);
+            $tempFiles = $this->listTempFiles($sessionId);
             foreach ($onboardData['tours'] as &$tour) {
                 $slug = \Illuminate\Support\Str::slug($tour['name']);
-                if (isset($tempFileMap[$slug])) {
-                    $tour['photos'] = $tempFileMap[$slug];
-                } elseif (isset($tempFileMap['__unassigned'])) {
-                    // Fallback: assign untagged photos to first tour that has none
-                    if (empty($tour['photos'])) {
-                        $tour['photos']              = $tempFileMap['__unassigned'];
-                        $tempFileMap['__unassigned']  = [];
-                    }
+
+                // Photos
+                if (isset($tempFiles['photos'][$slug])) {
+                    $tour['photos'] = $tempFiles['photos'][$slug];
+                } elseif (!empty($tempFiles['photos']['__unassigned']) && empty($tour['photos'])) {
+                    $tour['photos']                           = $tempFiles['photos']['__unassigned'];
+                    $tempFiles['photos']['__unassigned']       = [];
+                }
+
+                // Videos
+                if (isset($tempFiles['videos'][$slug])) {
+                    $tour['videos'] = $tempFiles['videos'][$slug];
+                } elseif (!empty($tempFiles['videos']['__unassigned']) && empty($tour['videos'])) {
+                    $tour['videos']                           = $tempFiles['videos']['__unassigned'];
+                    $tempFiles['videos']['__unassigned']       = [];
                 }
             }
             unset($tour);
@@ -133,9 +171,9 @@ class ParceirosController extends Controller
 
         if ($onboardData) {
             try {
-                $previewUrl = $onboarding->onboard($onboardData, $sessionId);
+                $pageUrl    = $onboarding->onboard($onboardData, $sessionId);
                 $email      = $onboardData['operator']['email'] ?? '';
-                $cleanReply = "Página criada. Você pode visualizá-la em:\n{$previewUrl}\n\nEnviamos um e-mail para {$email} com o link para ativar sua conta e acessar o painel. Qualquer dúvida, estou aqui.";
+                $cleanReply = "Página criada. Você pode visualizá-la em:\n{$pageUrl}\n\nEnviamos um e-mail para {$email} com o link para ativar sua conta e acessar o painel. Qualquer dúvida, estou aqui.";
             } catch (\Throwable $e) {
                 Log::error('parceiros.onboard failed', ['error' => $e->getMessage()]);
                 $cleanReply = 'Ocorreu um erro ao criar sua página. Nossa equipe foi notificada — tente novamente em alguns minutos.';
@@ -167,8 +205,8 @@ class ParceirosController extends Controller
         } elseif (!$confirmedData && str_contains($rawReply, '"action":"misuse"')) {
             $this->notifyAdminsMisuse($rawReply, $sessionId, $request->ip());
         } elseif (!$confirmedData && str_contains($rawReply, '"action":')) {
-            Log::warning('parceiros: JSON detected but unparseable', ['reply' => substr($rawReply, 0, 300)]);
-            $cleanReply = 'Estou finalizando o cadastro. Pode levar alguns segundos — tente novamente em instantes.';
+            Log::error('parceiros: action JSON unparseable', ['reply' => $rawReply]);
+            $cleanReply = 'Estou finalizando o cadastro. Pode um momento e responde "ok" para eu tentar novamente.';
         }
 
         $rows = [];
@@ -182,12 +220,14 @@ class ParceirosController extends Controller
                 'updated_at' => now(),
             ];
         }
-        // Save rawReply so [PHOTO_FOR:xxx] tags persist for future photo context lookups
+        // Save rawReply so [PHOTO_FOR:xxx] tags persist for future photo context.
+        // When an action JSON was processed, save $cleanReply instead to avoid leaking raw JSON into history display.
+        $savedReply = ($confirmedData || $onboardData || $outsideScopeData) ? $cleanReply : $rawReply;
         $rows[] = [
             'session_id' => $sessionId,
             'uuid'       => $sessionId,
             'role'       => 'assistant',
-            'message'    => $rawReply,
+            'message'    => $savedReply,
             'created_at' => now(),
             'updated_at' => now(),
         ];
@@ -273,25 +313,42 @@ class ParceirosController extends Controller
 
     private function listTempFiles(string $sessionId): array
     {
-        $files  = Storage::disk('local')->files("temp/{$sessionId}");
-        $groups = [];
+        $videoExts = ['mp4', 'mov', 'webm', 'avi'];
+        $files     = Storage::disk('local')->files("temp/{$sessionId}");
+        $result    = ['photos' => [], 'videos' => []];
+
         foreach ($files as $file) {
             $basename = basename($file);
+            // Skip sidecar files
+            if (str_ends_with($basename, '.poster')) continue;
+
+            $ext    = strtolower(pathinfo($basename, PATHINFO_EXTENSION));
+            $bucket = in_array($ext, $videoExts) ? 'videos' : 'photos';
+
             if (str_contains($basename, '__')) {
                 [$slug, ] = explode('__', $basename, 2);
-                $groups[$slug][] = $basename;
+                $result[$bucket][$slug][] = $basename;
             } else {
-                $groups['__unassigned'][] = $basename;
+                $result[$bucket]['__unassigned'][] = $basename;
             }
         }
-        return $groups;
+        return $result;
     }
 
     private function getPhotoContext(\Illuminate\Support\Collection $history): ?string
     {
-        // Find the most recent assistant message containing a [PHOTO_FOR:slug] tag
         foreach ($history->where('role', 'assistant')->reverse() as $msg) {
             if (preg_match('/\[PHOTO_FOR:([^\]]+)\]/', $msg->message, $m)) {
+                return $m[1];
+            }
+        }
+        return null;
+    }
+
+    private function getVideoContext(\Illuminate\Support\Collection $history): ?string
+    {
+        foreach ($history->where('role', 'assistant')->reverse() as $msg) {
+            if (preg_match('/\[VIDEO_FOR:([^\]]+)\]/', $msg->message, $m)) {
                 return $m[1];
             }
         }
