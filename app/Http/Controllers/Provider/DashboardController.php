@@ -74,6 +74,7 @@ class DashboardController extends Controller
 
         $bookings = Booking::whereHas('schedule', fn($q) => $q->whereIn('activity_id', $activityIds))
             ->with('schedule.activity')
+            ->whereIn('status', ['confirmed', 'cancelled'])
             ->orderByDesc('created_at')
             ->get();
 
