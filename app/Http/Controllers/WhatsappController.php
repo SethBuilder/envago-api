@@ -10,6 +10,19 @@ use Illuminate\Support\Facades\Log;
 
 class WhatsappController extends Controller
 {
+    public function verify(Request $request): Response
+    {
+        $mode      = $request->query('hub_mode');
+        $token     = $request->query('hub_verify_token');
+        $challenge = $request->query('hub_challenge');
+
+        if ($mode === 'subscribe' && $token === env('META_WEBHOOK_VERIFY_TOKEN')) {
+            return response($challenge, 200);
+        }
+
+        return response('Forbidden', 403);
+    }
+
     public function webhook(Request $request, LaraService $lara): Response
     {
         $from = $request->input('From', '');

@@ -20,6 +20,7 @@ Route::prefix('v1')->group(function () {
 });
 
 Route::post('webhooks/stripe',    [StripeWebhookController::class, 'handle']);
+Route::get('webhooks/whatsapp',   [WhatsappController::class,        'verify']);
 Route::post('webhooks/whatsapp',  [WhatsappController::class,        'webhook']);
 
 Route::post('lara/message', [LaraChatController::class, 'message']);
