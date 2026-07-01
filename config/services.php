@@ -41,9 +41,10 @@ return [
         'webhook_secret'  => env('STRIPE_WEBHOOK_SECRET'),
     ],
 
-    'zapi' => [
-        'instance_id' => env('ZAPI_INSTANCE_ID'),
-        'token'       => env('ZAPI_TOKEN'),
+    'twilio' => [
+        'account_sid' => env('TWILIO_ACCOUNT_SID'),
+        'auth_token'  => env('TWILIO_AUTH_TOKEN'),
+        'from'        => env('TWILIO_WHATSAPP_FROM'), // e.g. whatsapp:+14155238886
     ],
 
     'google' => [

@@ -114,13 +114,19 @@ class StripeWebhookController extends Controller
             }
         }
 
-        // ── WhatsApp via Z-API ───────────────────────────────────────────
-        $instanceId = config('services.zapi.instance_id');
-        $zapiToken  = config('services.zapi.token');
-        $phone      = $provider?->whatsapp_number;
+        // ── WhatsApp via Twilio ──────────────────────────────────────────
+        $twilioSid   = config('services.twilio.account_sid');
+        $twilioToken = config('services.twilio.auth_token');
+        $twilioFrom  = config('services.twilio.from');
+        $phone       = $provider?->whatsapp_number;
 
-        if ($instanceId && $zapiToken && $phone) {
+        if ($twilioSid && $twilioToken && $twilioFrom && $phone) {
             try {
+                $digits = preg_replace('/\D/', '', $phone);
+                if (strlen($digits) <= 11) {
+                    $digits = '55' . $digits; // add BR country code if missing
+                }
+
                 $message = "🎉 *Nova reserva confirmada!*\n\n"
                     . "📌 *{$activity->name}*\n"
                     . "👤 {$name}\n"
@@ -129,10 +135,13 @@ class StripeWebhookController extends Controller
                     . "💰 {$total}\n"
                     . "🔖 {$ref}";
 
-                \Illuminate\Support\Facades\Http::post(
-                    "https://api.z-api.io/instances/{$instanceId}/token/{$zapiToken}/send-text",
-                    ['phone' => $phone, 'message' => $message]
-                );
+                \Illuminate\Support\Facades\Http::withBasicAuth($twilioSid, $twilioToken)
+                    ->asForm()
+                    ->post("https://api.twilio.com/2010-04-01/Accounts/{$twilioSid}/Messages.json", [
+                        'From' => $twilioFrom,
+                        'To'   => 'whatsapp:+' . $digits,
+                        'Body' => $message,
+                    ]);
             } catch (\Throwable) {}
         }
     }

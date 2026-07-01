@@ -8,6 +8,7 @@ use App\Http\Controllers\Api\V1\CategoryController;
 use App\Http\Controllers\Api\V1\LaraChatController;
 use App\Http\Controllers\Api\V1\ProviderController;
 use App\Http\Controllers\Api\V1\StripeWebhookController;
+use App\Http\Controllers\WhatsappController;
 
 Route::prefix('v1')->group(function () {
     Route::get('categories', [CategoryController::class, 'index']);
@@ -18,7 +19,8 @@ Route::prefix('v1')->group(function () {
     Route::get('bookings/{reference}/status', [BookingController::class, 'status']);
 });
 
-Route::post('webhooks/stripe', [StripeWebhookController::class, 'handle']);
+Route::post('webhooks/stripe',    [StripeWebhookController::class, 'handle']);
+Route::post('webhooks/whatsapp',  [WhatsappController::class,        'webhook']);
 
 Route::post('lara/message', [LaraChatController::class, 'message']);
 Route::post('lara/reset',   [LaraChatController::class, 'reset']);
