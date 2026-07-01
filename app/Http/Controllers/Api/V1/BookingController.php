@@ -18,9 +18,10 @@ class BookingController extends Controller
         $data = $request->validate([
             'schedule_id' => ['required', 'integer', 'exists:schedules,id'],
             'seats'       => ['required', 'integer', 'min:1', 'max:20'],
-            'guest_name'  => ['required', 'string', 'max:120'],
-            'guest_email' => ['required', 'email', 'max:180'],
-            'guest_cpf'   => ['nullable', 'string', 'min:11', 'max:14'],
+            'guest_name'      => ['required', 'string', 'max:120'],
+            'guest_email'     => ['required', 'email', 'max:180'],
+            'guest_cpf'       => ['nullable', 'string', 'min:11', 'max:14'],
+            'guest_whatsapp'  => ['nullable', 'string', 'max:20'],
         ]);
 
         try {
@@ -41,7 +42,8 @@ class BookingController extends Controller
                     'total_price' => $totalPrice,
                     'guest_name'  => $data['guest_name'],
                     'guest_email' => $data['guest_email'],
-                    'guest_cpf'   => isset($data['guest_cpf']) ? preg_replace('/\D/', '', $data['guest_cpf']) : null,
+                    'guest_cpf'       => isset($data['guest_cpf']) ? preg_replace('/\D/', '', $data['guest_cpf']) : null,
+                    'guest_whatsapp'  => isset($data['guest_whatsapp']) ? preg_replace('/\D/', '', $data['guest_whatsapp']) : null,
                     'reference'   => 'ENV-' . strtoupper(Str::random(6)),
                     'status'      => 'pending',
                 ]);

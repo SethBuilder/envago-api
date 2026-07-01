@@ -51,6 +51,11 @@ class Activity extends Model
         return $this->hasOne(Media::class)->where('type', 'cover')->orderBy('order');
     }
 
+    public function firstVideo()
+    {
+        return $this->hasOne(Media::class)->where('type', 'video')->orderBy('order');
+    }
+
     public function reviews()
     {
         return $this->hasMany(Review::class)->where('is_approved', true);

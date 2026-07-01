@@ -53,12 +53,15 @@ class StripeWebhookController extends Controller
         $provider = $activity->provider;
         $operator = $provider?->user;
 
-        $date  = $booking->schedule->date->format('d/m/Y');
-        $time  = substr($booking->schedule->time, 0, 5);
-        $seats = $booking->seats;
-        $total = 'R$ ' . number_format($booking->total_price, 0, ',', '.');
-        $name  = $booking->guest_name;
-        $ref   = $booking->reference;
+        $date      = $booking->schedule->date->format('d/m/Y');
+        $time      = substr($booking->schedule->time, 0, 5);
+        $seats     = $booking->seats;
+        $total     = 'R$ ' . number_format($booking->total_price, 0, ',', '.');
+        $name      = $booking->guest_name;
+        $ref       = $booking->reference;
+        $guestWa   = $booking->guest_whatsapp;
+        $waDigits  = $guestWa ? (strlen($guestWa) <= 11 ? '55' . $guestWa : $guestWa) : null;
+        $waLink    = $waDigits ? "https://wa.me/{$waDigits}" : null;
 
         $resendKey = config('services.resend.key');
         // Use verified domain in prod; onboarding@resend.dev always works in dev
@@ -108,6 +111,7 @@ class StripeWebhookController extends Controller
                             <p><strong>Pessoas:</strong> {$seats}</p>
                             <p><strong>Total:</strong> {$total}</p>
                             <p><strong>Código:</strong> {$ref}</p>
+                            " . ($waLink ? "<p><strong>WhatsApp do turista:</strong> <a href=\"{$waLink}\">{$guestWa}</a></p>" : "") . "
                         ",
                     ]);
                 } catch (\Throwable) {}
@@ -133,7 +137,8 @@ class StripeWebhookController extends Controller
                     . "📅 {$date} às {$time}\n"
                     . "👥 {$seats} pessoa" . ($seats > 1 ? 's' : '') . "\n"
                     . "💰 {$total}\n"
-                    . "🔖 {$ref}";
+                    . "🔖 {$ref}"
+                    . ($waLink ? "\n📱 wa.me/{$waDigits}" : '');
 
                 \Illuminate\Support\Facades\Http::withBasicAuth($twilioSid, $twilioToken)
                     ->asForm()

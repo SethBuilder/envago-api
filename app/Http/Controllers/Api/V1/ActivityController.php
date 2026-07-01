@@ -11,7 +11,7 @@ class ActivityController extends Controller
 {
     public function index(Request $request)
     {
-        $query = Activity::public()->with(['category', 'cover', 'provider', 'reviews']);
+        $query = Activity::public()->with(['category', 'cover', 'firstVideo', 'provider', 'reviews']);
 
         if ($request->filled('category')) {
             $query->whereHas('category', fn($q) => $q->where('slug', $request->category));
@@ -37,6 +37,7 @@ class ActivityController extends Controller
                 'state'            => $a->state,
                 'category'         => $a->category?->only(['id', 'name', 'slug']),
                 'cover_url'        => $a->cover?->url,
+                'first_video'      => !$a->cover && $a->firstVideo ? ['url' => $a->firstVideo->url, 'poster_url' => $a->firstVideo->poster_url] : null,
                 'provider'         => $a->provider ? ['id' => $a->provider->id, 'business_name' => $a->provider->business_name, 'slug' => $a->provider->slug, 'logo_url' => $a->provider->logo_url] : null,
                 'avg_rating'       => $a->reviews->avg('rating') ? round($a->reviews->avg('rating'), 1) : null,
                 'review_count'     => $a->reviews->count(),
