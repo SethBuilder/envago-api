@@ -135,9 +135,20 @@
             </label>
           </div>
           <div id="pricing-unit-wrap" style="display:none;margin-top:8px;">
-            <input type="text" name="pricing_unit" class="f-input" id="f-pricing_unit"
-              placeholder="ex: buggy, barco, cavalo" maxlength="30" autocomplete="off">
-            <span class="f-error" id="err-pricing_unit"></span>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+              <div>
+                <input type="text" name="pricing_unit" class="f-input" id="f-pricing_unit"
+                  placeholder="ex: buggy, barco, cavalo" maxlength="30" autocomplete="off">
+                <span class="f-hint">Nome da unidade</span>
+                <span class="f-error" id="err-pricing_unit"></span>
+              </div>
+              <div>
+                <input type="number" name="unit_capacity" class="f-input" id="f-unit_capacity"
+                  placeholder="ex: 4" min="1" max="99">
+                <span class="f-hint" id="unit-capacity-hint">Pessoas por unidade</span>
+                <span class="f-error" id="err-unit_capacity"></span>
+              </div>
+            </div>
           </div>
           <span class="f-error" id="err-price"></span>
         </div>
@@ -268,7 +279,13 @@ function onPricingTypeChange(val) {
   document.getElementById('price-label').innerHTML = val === 'per_unit'
     ? 'Preço por unidade <span style="color:#ff2924">*</span>'
     : 'Preço por pessoa <span style="color:#ff2924">*</span>';
+  const unit = document.getElementById('f-pricing_unit')?.value.trim() || 'unidade';
+  document.getElementById('unit-capacity-hint').textContent = `Pessoas por ${unit}`;
 }
+document.getElementById('f-pricing_unit')?.addEventListener('input', function() {
+  const unit = this.value.trim() || 'unidade';
+  document.getElementById('unit-capacity-hint').textContent = `Pessoas por ${unit}`;
+});
 
 // ── Google Places autocomplete ────────────────────────────────
 function initPlaces() {

@@ -39,6 +39,7 @@ class ActivityController extends Controller
             'groups.*.times.*'  => 'date_format:H:i',
             'pricing_type'      => 'nullable|in:per_person,per_unit',
             'pricing_unit'      => 'nullable|string|max:30|required_if:pricing_type,per_unit',
+            'unit_capacity'     => 'nullable|integer|min:1|max:99',
             'photos'            => 'required',
             'photos.*'          => 'image|mimes:jpeg,png,jpg,webp|max:20480',
         ], [

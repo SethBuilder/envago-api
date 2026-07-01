@@ -34,8 +34,9 @@ class ActivityService
             $categoryId = $category->id;
         }
 
-        $pricingType = $data['pricing_type'] ?? 'per_person';
-        $pricingUnit = $pricingType === 'per_unit' ? ($data['pricing_unit'] ?? null) : null;
+        $pricingType  = $data['pricing_type'] ?? 'per_person';
+        $pricingUnit  = $pricingType === 'per_unit' ? ($data['pricing_unit'] ?? null) : null;
+        $unitCapacity = $pricingType === 'per_unit' ? ($data['unit_capacity'] ?? null) : null;
 
         $activity = Activity::create([
             'provider_id'       => $provider->id,
@@ -46,6 +47,7 @@ class ActivityService
             'price'             => $data['price'],
             'pricing_type'      => $pricingType,
             'pricing_unit'      => $pricingUnit,
+            'unit_capacity'     => $unitCapacity,
             'duration_minutes'  => $data['duration_minutes'],
             'capacity'          => $data['capacity'],
             'city'              => $data['city'],
@@ -71,8 +73,9 @@ class ActivityService
      */
     public function updateActivity(Activity $activity, array $data, array $newPhotos = [], array $deleteMediaIds = [], array $newVideos = []): Activity
     {
-        $pricingType = $data['pricing_type'] ?? $activity->pricing_type;
-        $pricingUnit = $pricingType === 'per_unit' ? ($data['pricing_unit'] ?? $activity->pricing_unit) : null;
+        $pricingType  = $data['pricing_type'] ?? $activity->pricing_type;
+        $pricingUnit  = $pricingType === 'per_unit' ? ($data['pricing_unit'] ?? $activity->pricing_unit) : null;
+        $unitCapacity = $pricingType === 'per_unit' ? ($data['unit_capacity'] ?? $activity->unit_capacity) : null;
 
         $activity->update([
             'category_id'       => $data['category_id'] ?? $activity->category_id,
@@ -81,6 +84,7 @@ class ActivityService
             'price'             => $data['price'],
             'pricing_type'      => $pricingType,
             'pricing_unit'      => $pricingUnit,
+            'unit_capacity'     => $unitCapacity,
             'duration_minutes'  => $data['duration_minutes'],
             'capacity'          => $data['capacity'],
             'city'              => $data['city'],

@@ -48,13 +48,13 @@ Output APENAS o JSON abaixo, em uma unica linha continua.
 NENHUM texto antes. NENHUM texto depois. Sem markdown. Sem explicacao.
 O sistema intercepta este JSON, gera a pagina e envia a resposta ao operador automaticamente.
 
-{"action":"confirmed","business_name":"string","email":"string","whatsapp":"string or empty","city":"string","state":"2-letter UF","tours":"nome|categoria|preco|pricing_type(per_person ou per_unit)|pricing_unit(nome da unidade ou vazio)|duracao_min|capacidade|dias(0-6 separados por virgula)|horarios(separados por virgula)|ponto_encontro — uma linha por passeio separadas por ponto-e-virgula"}
+{"action":"confirmed","business_name":"string","email":"string","whatsapp":"string or empty","city":"string","state":"2-letter UF","tours":"nome|categoria|preco|pricing_type(per_person ou per_unit)|pricing_unit(nome da unidade ou vazio)|unit_capacity(pessoas por unidade ou vazio)|duracao_min|capacidade|dias(0-6 separados por virgula)|horarios(separados por virgula)|ponto_encontro — uma linha por passeio separadas por ponto-e-virgula"}
 
 Regras (restricoes do sistema):
 - city e state nao podem ser vazios.
 - "business_name": use exatamente o nome que o operador informou.
 - dias: 0=domingo,1=segunda,...,6=sabado.
-- pricing_type: "per_person" se o preco e por pessoa. "per_unit" se o preco e por veiculo ou grupo (ex: "R$300 o buggy", "por lancha", "pelo cavalo"). pricing_unit: nome da unidade em minusculas (ex: "buggy", "barco", "cavalo") quando per_unit, ou vazio quando per_person.
+- pricing_type: "per_person" se o preco e por pessoa. "per_unit" se o preco e por veiculo ou grupo (ex: "R$300 o buggy", "por lancha", "pelo cavalo"). pricing_unit: nome da unidade em minusculas (ex: "buggy", "barco", "cavalo") quando per_unit, ou vazio quando per_person. unit_capacity: numero de pessoas que cabem por unidade (ex: "buggy de 4 lugares" → 4), ou vazio se nao mencionado.
 
 ## Escalonamento
 Se houver disputa, payout em falta, suspensao ou situacao que exige julgamento humano:
@@ -87,13 +87,14 @@ PROMPT;
 You are a JSON formatter for Envago. Convert the confirmed operator data below into the exact JSON schema. Output ONLY valid JSON on a single line. No text before or after. No markdown.
 
 Schema:
-{"action":"onboard","operator":{"business_name":"","email":"","whatsapp":"","city":"","state":""},"tours":[{"name":"","category_slug":"","category_name":"","price":0,"pricing_type":"per_person","pricing_unit":null,"duration_minutes":0,"capacity":0,"schedules":[{"days":[1,2,3,4,5],"times":["08:00"]}],"description":null,"meeting_point":null,"photos":[]}]}
+{"action":"onboard","operator":{"business_name":"","email":"","whatsapp":"","city":"","state":""},"tours":[{"name":"","category_slug":"","category_name":"","price":0,"pricing_type":"per_person","pricing_unit":null,"unit_capacity":null,"duration_minutes":0,"capacity":0,"schedules":[{"days":[1,2,3,4,5],"times":["08:00"]}],"description":null,"meeting_point":null,"photos":[]}]}
 
 Rules:
 - days: integers 0=Sunday,1=Monday,...,6=Saturday.
 - category_slug: lowercase slug. category_name: display name in Portuguese.
 - pricing_type: "per_person" if price is per person. "per_unit" if price is per vehicle or group (e.g., "R$300 o buggy", "por lancha").
 - pricing_unit: the unit name in lowercase Portuguese (e.g., "buggy", "barco", "cavalo") when pricing_type is "per_unit". null otherwise.
+- unit_capacity: integer — how many people fit in one unit (e.g., "buggy de 4 lugares" → 4). null if not mentioned or per_person.
 - photos: array of filenames. Empty array if none.
 - Output one single JSON line. No extra whitespace.
 PROMPT;
