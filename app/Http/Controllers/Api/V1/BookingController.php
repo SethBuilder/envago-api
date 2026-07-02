@@ -58,10 +58,15 @@ class BookingController extends Controller
 
             $activity = $booking->schedule->activity;
 
+            $paymentMethods = ['card'];
+            if (config('services.stripe.pix_enabled')) {
+                $paymentMethods[] = 'pix';
+            }
+
             $pi = PaymentIntent::create([
                 'amount'               => (int) ($booking->total_price * 100),
                 'currency'             => 'brl',
-                'payment_method_types' => ['card', 'pix'],
+                'payment_method_types' => $paymentMethods,
                 'metadata'             => [
                     'booking_reference' => $booking->reference,
                     'booking_id'        => $booking->id,
@@ -94,6 +99,9 @@ class BookingController extends Controller
             throw $e;
         } catch (\Symfony\Component\HttpKernel\Exception\HttpException $e) {
             return response()->json(['message' => $e->getMessage()], $e->getStatusCode());
+        } catch (\Throwable $e) {
+            \Log::error('Booking creation failed: ' . $e->getMessage());
+            return response()->json(['message' => 'Erro ao processar reserva. Tente novamente.'], 500);
         }
     }
 
