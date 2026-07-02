@@ -95,6 +95,7 @@ Rules:
 - pricing_type: "per_person" if price is per person. "per_unit" if price is per vehicle or group (e.g., "R$300 o buggy", "por lancha").
 - pricing_unit: the unit name in lowercase Portuguese (e.g., "buggy", "barco", "cavalo") when pricing_type is "per_unit". null otherwise.
 - unit_capacity: integer — how many people fit in one unit (e.g., "buggy de 4 lugares" → 4). null if not mentioned or per_person.
+- capacity: for per_person = max people per schedule slot. For per_unit = number of units available per slot (e.g., operator has 2 buggies → capacity=2; each buggy fits 4 → unit_capacity=4; total people per slot = 2×4=8).
 - photos: array of filenames. Empty array if none.
 - Output one single JSON line. No extra whitespace.
 PROMPT;
