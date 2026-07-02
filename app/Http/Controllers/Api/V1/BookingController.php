@@ -28,6 +28,17 @@ class BookingController extends Controller
             $booking = DB::transaction(function () use ($data) {
                 $schedule = Schedule::lockForUpdate()->findOrFail($data['schedule_id']);
 
+                // Clean up orphaned pending bookings (Stripe failed before payment_ref was set)
+                $orphaned = Booking::where('schedule_id', $schedule->id)
+                    ->where('status', 'pending')
+                    ->whereNull('payment_ref')
+                    ->get();
+                foreach ($orphaned as $o) {
+                    $schedule->decrement('seats_booked', $o->seats);
+                    $o->delete();
+                }
+                $schedule->refresh();
+
                 $seatsLeft = $schedule->seats_total - $schedule->seats_booked;
                 if ($data['seats'] > $seatsLeft) {
                     abort(422, 'Não há vagas suficientes para este horário.');
@@ -101,6 +112,11 @@ class BookingController extends Controller
             return response()->json(['message' => $e->getMessage()], $e->getStatusCode());
         } catch (\Throwable $e) {
             \Log::error('Booking creation failed: ' . $e->getMessage());
+            // Roll back seats if booking was created but Stripe failed
+            if (isset($booking) && !$booking->payment_ref) {
+                $booking->schedule->decrement('seats_booked', $booking->seats);
+                $booking->delete();
+            }
             return response()->json(['message' => 'Erro ao processar reserva. Tente novamente.'], 500);
         }
     }

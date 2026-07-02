@@ -39,7 +39,7 @@ return [
         'secret'          => env('STRIPE_SECRET_KEY'),
         'client_id'       => env('STRIPE_CLIENT_ID'),
         'webhook_secret'  => env('STRIPE_WEBHOOK_SECRET'),
-        'pix_enabled'     => env('STRIPE_PIX_ENABLED', false),
+        'pix_enabled'     => env('STRIPE_PIX_ENABLED', true),
     ],
 
     'twilio' => [
