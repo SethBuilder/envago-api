@@ -63,6 +63,12 @@ class StripeWebhookController extends Controller
         $waDigits  = $guestWa ? (strlen($guestWa) <= 11 ? '55' . $guestWa : $guestWa) : null;
         $waLink    = $waDigits ? "https://wa.me/{$waDigits}" : null;
 
+        $isPerUnit   = $activity->pricing_type === 'per_unit';
+        $unitLabel   = $isPerUnit ? ($activity->pricing_unit ?? 'unidade') : 'pessoa';
+        $unitsLabel  = $isPerUnit
+            ? "{$seats} {$unitLabel}" . ($seats > 1 ? 's' : '')
+            : "{$seats} pessoa" . ($seats > 1 ? 's' : '');
+
         $resendKey = config('services.resend.key');
         // Use verified domain in prod; onboarding@resend.dev always works in dev
         $from = env('RESEND_FROM', 'Envago <onboarding@resend.dev>');
@@ -83,7 +89,7 @@ class StripeWebhookController extends Controller
                         <br>
                         <p><strong>Passeio:</strong> {$activity->name}</p>
                         <p><strong>Data:</strong> {$date} às {$time}</p>
-                        <p><strong>Pessoas:</strong> {$seats}</p>
+                        <p><strong>Quantidade:</strong> {$unitsLabel}</p>
                         <p><strong>Total pago:</strong> {$total}</p>
                         <p><strong>Código da reserva:</strong> {$ref}</p>
                         <br>
@@ -108,7 +114,7 @@ class StripeWebhookController extends Controller
                             <p><strong>Passeio:</strong> {$activity->name}</p>
                             <p><strong>Turista:</strong> {$name}</p>
                             <p><strong>Data:</strong> {$date} às {$time}</p>
-                            <p><strong>Pessoas:</strong> {$seats}</p>
+                            <p><strong>Quantidade:</strong> {$unitsLabel}</p>
                             <p><strong>Total:</strong> {$total}</p>
                             <p><strong>Código:</strong> {$ref}</p>
                             " . ($waLink ? "<p><strong>WhatsApp do turista:</strong> <a href=\"{$waLink}\">{$guestWa}</a></p>" : "") . "
@@ -135,7 +141,7 @@ class StripeWebhookController extends Controller
                     . "📌 *{$activity->name}*\n"
                     . "👤 {$name}\n"
                     . "📅 {$date} às {$time}\n"
-                    . "👥 {$seats} pessoa" . ($seats > 1 ? 's' : '') . "\n"
+                    . "👥 {$unitsLabel}\n"
                     . "💰 {$total}\n"
                     . "🔖 {$ref}"
                     . ($waLink ? "\n📱 wa.me/{$waDigits}" : '');
