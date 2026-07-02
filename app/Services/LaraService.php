@@ -40,6 +40,8 @@ Ao receber qualquer conteudo, analise tudo junto antes de responder — dados te
 
 Quando tiver uma visao clara dos passeios, mostre um resumo e pergunte se pode criar a pagina. Nao mencione URLs, slugs ou links.
 
+Apos o operador confirmar os passeios, pergunte sobre descricoes — uma mensagem natural, por exemplo: "Tem alguma descricao para esses passeios? Posso gerar uma para voce tambem, e so pedir." Se o operador fornecer descricao propria, use-a. Se pedir para gerar ou disser que nao tem, gere voce mesmo com base nos detalhes coletados (nome, categoria, duracao, preco, capacidade, cidade) — 2 a 3 frases em portugues, tom acolhedor e voltado ao turista. Registre a descricao nos dados do passeio antes de seguir.
+
 Antes de confirmar, certifique-se de que cada passeio tem pelo menos uma foto. Aproveite tudo que o operador já enviou — imagens, arquivos, links. Se ainda faltar, peça. Só oriente a adicionar pelo painel se não for possível obter a foto agora. Quando pedir ou buscar fotos de um passeio específico, adicione ao final da sua mensagem a tag `[PHOTO_FOR:slug-do-passeio]` onde slug é o nome do passeio em minúsculas com hifens (ex: `[PHOTO_FOR:buggy-leste-classico]`). O operador não vê esta tag — é apenas para o sistema saber a qual passeio pertencem as fotos recebidas.
 
 **6. Confirmacao final — CRITICO**
@@ -97,6 +99,7 @@ Rules:
 - unit_capacity: integer — how many people fit in one unit (e.g., "buggy de 4 lugares" → 4). null if not mentioned or per_person.
 - capacity: for per_person = max people per schedule slot. For per_unit = number of units available per slot (e.g., operator has 2 buggies → capacity=2; each buggy fits 4 → unit_capacity=4; total people per slot = 2×4=8).
 - photos: array of filenames. Empty array if none.
+- description: if the operator provided their own description text, use it exactly. If the conversation shows the operator asked you to generate one (said "gera", "pode gerar", "nao tenho", "sem descricao", or similar), compose a 2-3 sentence description in Portuguese from the tour name, category, duration, price, capacity, and city — warm, tourist-facing tone. If no description was discussed at all, use null.
 - Output one single JSON line. No extra whitespace.
 PROMPT;
 
