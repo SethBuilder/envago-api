@@ -42,10 +42,9 @@ return [
         'pix_enabled'     => env('STRIPE_PIX_ENABLED', true),
     ],
 
-    'twilio' => [
-        'account_sid' => env('TWILIO_ACCOUNT_SID'),
-        'auth_token'  => env('TWILIO_AUTH_TOKEN'),
-        'from'        => env('TWILIO_WHATSAPP_FROM'), // e.g. whatsapp:+14155238886
+    'whatsapp' => [
+        'phone_number_id' => env('WHATSAPP_PHONE_NUMBER_ID'),
+        'token'           => env('WHATSAPP_TOKEN'),
     ],
 
     'google' => [
@@ -56,6 +55,7 @@ return [
             'client_secret'   => env('GOOGLE_ADS_CLIENT_SECRET'),
             'refresh_token'   => env('GOOGLE_ADS_REFRESH_TOKEN'),
             'customer_id'     => env('GOOGLE_ADS_CUSTOMER_ID'),
+            'manager_id'      => env('GOOGLE_ADS_MANAGER_ID'),
         ],
     ],
 

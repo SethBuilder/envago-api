@@ -4,9 +4,11 @@ namespace App\Http\Controllers;
 
 use App\Services\ApifyService;
 use App\Services\LaraService;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 
@@ -25,20 +27,23 @@ class WhatsappController extends Controller
         return response('Forbidden', 403);
     }
 
-    public function webhook(Request $request, LaraService $lara): Response
+    public function webhook(Request $request, LaraService $lara): JsonResponse
     {
-        $from = $request->input('From', '');
-        $body = trim($request->input('Body', ''));
+        $message = $request->input('entry.0.changes.0.value.messages.0');
 
-        $phone = str_replace('whatsapp:', '', $from);
-
-        if (!$phone || !$body) {
-            return $this->twiml('');
+        if (!$message || ($message['type'] ?? '') !== 'text') {
+            return response()->json(['status' => 'ok']);
         }
 
-        $digits = preg_replace('/\D/', '', $phone);
+        $from = $message['from'];
+        $body = trim($message['text']['body'] ?? '');
 
-        // Look up provider by last 10 digits (tolerant of different storage formats)
+        if (!$from || !$body) {
+            return response()->json(['status' => 'ok']);
+        }
+
+        $digits = preg_replace('/\D/', '', $from);
+
         $provider = DB::table('providers')
             ->join('users', 'users.id', '=', 'providers.user_id')
             ->select('providers.*', 'users.email')
@@ -69,7 +74,6 @@ class WhatsappController extends Controller
 
         set_time_limit(120);
 
-        // Detect Instagram URLs and scrape videos via Apify
         $igVideoNotes = '';
         preg_match_all('~https?://(?:www\.)?instagram\.com/(?:reel|p)/[A-Za-z0-9_\-]+/?~', $body, $igMatches);
         if (!empty($igMatches[0])) {
@@ -103,11 +107,11 @@ class WhatsappController extends Controller
                 $providerInfo
             );
         } catch (\Throwable $e) {
-            Log::error('whatsapp.lara_error', ['phone' => $phone, 'error' => $e->getMessage()]);
-            return $this->twiml('Algo deu errado. Tente novamente em instantes.');
+            Log::error('whatsapp.lara_error', ['phone' => $from, 'error' => $e->getMessage()]);
+            self::sendMessage($from, 'Algo deu errado. Tente novamente em instantes.');
+            return response()->json(['status' => 'ok']);
         }
 
-        // Strip action JSON blocks before sending — operators must not see raw JSON in WhatsApp
         $displayReply = $reply;
         foreach (['{"action":"confirmed"', '{"action":"onboard"', '{"action":"outside_scope"', '{"action":"misuse"'] as $marker) {
             $pos = strpos($displayReply, $marker);
@@ -121,11 +125,39 @@ class WhatsappController extends Controller
         }
 
         DB::table('lara_conversations')->insert([
-            ['session_id' => $sessionId, 'uuid' => $sessionId, 'role' => 'user',      'message' => $body,        'created_at' => now(), 'updated_at' => now()],
+            ['session_id' => $sessionId, 'uuid' => $sessionId, 'role' => 'user',      'message' => $body,         'created_at' => now(), 'updated_at' => now()],
             ['session_id' => $sessionId, 'uuid' => $sessionId, 'role' => 'assistant', 'message' => $displayReply, 'created_at' => now(), 'updated_at' => now()],
         ]);
 
-        return $this->twiml($displayReply);
+        self::sendMessage($from, $displayReply);
+
+        return response()->json(['status' => 'ok']);
+    }
+
+    public static function sendMessage(string $to, string $body): void
+    {
+        $phoneNumberId = config('services.whatsapp.phone_number_id');
+        $token         = config('services.whatsapp.token');
+
+        if (!$phoneNumberId || !$token) {
+            return;
+        }
+
+        try {
+            $response = Http::withToken($token)
+                ->post("https://graph.facebook.com/v20.0/{$phoneNumberId}/messages", [
+                    'messaging_product' => 'whatsapp',
+                    'to'                => $to,
+                    'type'              => 'text',
+                    'text'              => ['body' => $body],
+                ]);
+
+            if (!$response->successful()) {
+                Log::warning('whatsapp.send_failed', ['to' => $to, 'body' => $response->body()]);
+            }
+        } catch (\Throwable $e) {
+            Log::error('whatsapp.send_error', ['to' => $to, 'error' => $e->getMessage()]);
+        }
     }
 
     private function getVideoContext(\Illuminate\Support\Collection $history): ?string
@@ -136,13 +168,5 @@ class WhatsappController extends Controller
             }
         }
         return null;
-    }
-
-    private function twiml(string $message): Response
-    {
-        $escaped = htmlspecialchars($message, ENT_XML1, 'UTF-8');
-        $xml     = "<?xml version=\"1.0\" encoding=\"UTF-8\"?><Response><Message>{$escaped}</Message></Response>";
-
-        return response($xml, 200)->header('Content-Type', 'text/xml');
     }
 }

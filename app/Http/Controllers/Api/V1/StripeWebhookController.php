@@ -124,17 +124,14 @@ class StripeWebhookController extends Controller
             }
         }
 
-        // ── WhatsApp via Twilio ──────────────────────────────────────────
-        $twilioSid   = config('services.twilio.account_sid');
-        $twilioToken = config('services.twilio.auth_token');
-        $twilioFrom  = config('services.twilio.from');
-        $phone       = $provider?->whatsapp_number;
+        // ── WhatsApp via Cloud API ───────────────────────────────────────
+        $phone = $provider?->whatsapp_number;
 
-        if ($twilioSid && $twilioToken && $twilioFrom && $phone) {
+        if ($phone && config('services.whatsapp.token')) {
             try {
                 $digits = preg_replace('/\D/', '', $phone);
                 if (strlen($digits) <= 11) {
-                    $digits = '55' . $digits; // add BR country code if missing
+                    $digits = '55' . $digits;
                 }
 
                 $message = "🎉 *Nova reserva confirmada!*\n\n"
@@ -146,13 +143,7 @@ class StripeWebhookController extends Controller
                     . "🔖 {$ref}"
                     . ($waLink ? "\n📱 wa.me/{$waDigits}" : '');
 
-                \Illuminate\Support\Facades\Http::withBasicAuth($twilioSid, $twilioToken)
-                    ->asForm()
-                    ->post("https://api.twilio.com/2010-04-01/Accounts/{$twilioSid}/Messages.json", [
-                        'From' => $twilioFrom,
-                        'To'   => 'whatsapp:+' . $digits,
-                        'Body' => $message,
-                    ]);
+                \App\Http\Controllers\WhatsappController::sendMessage($digits, $message);
             } catch (\Throwable) {}
         }
     }
