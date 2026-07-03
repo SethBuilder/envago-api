@@ -22,6 +22,11 @@
       @csrf
       <button type="submit" class="btn btn-ghost">Ver como operador</button>
     </form>
+    <form method="POST" action="{{ route('admin.providers.destroy', $provider) }}"
+          onsubmit="return confirm('Arquivar {{ addslashes($provider->business_name) }}? O operador e os passeios ficarão ocultos do site mas os dados são mantidos.')">
+      @csrf @method('DELETE')
+      <button type="submit" class="btn btn-ghost" style="color:#e53e3e;">Arquivar operador</button>
+    </form>
   </div>
   @if($provider->isPending())
     <form method="POST" action="{{ route('admin.providers.approve', $provider) }}" style="display:flex; gap:8px;">
@@ -63,14 +68,24 @@
     <div class="empty"><p>Nenhum passeio cadastrado.</p></div>
   @else
     <table>
-      <thead><tr><th>Nome</th><th>Preço</th><th>Duração</th><th>Capacidade</th></tr></thead>
+      <thead><tr><th>Nome</th><th>Preço</th><th>Duração</th><th>Capacidade</th><th></th></tr></thead>
       <tbody>
         @foreach($provider->activities as $activity)
-        <tr>
-          <td style="font-weight:500;">{{ $activity->name }}</td>
+        @php $actDeleted = $activity->trashed(); @endphp
+        <tr style="{{ $actDeleted ? 'opacity:0.4;' : '' }}">
+          <td style="font-weight:500;">{{ $activity->name }}{{ $actDeleted ? ' (arquivado)' : '' }}</td>
           <td>R$ {{ number_format($activity->price, 0, ',', '.') }}</td>
           <td>{{ $activity->duration_minutes }} min</td>
           <td>{{ $activity->capacity }} pessoas</td>
+          <td>
+            @if(!$actDeleted)
+            <form method="POST" action="{{ route('admin.providers.activities.destroy', [$provider, $activity]) }}"
+                  onsubmit="return confirm('Arquivar passeio \"{{ addslashes($activity->name) }}\"?')">
+              @csrf @method('DELETE')
+              <button type="submit" style="background:none;border:none;color:#e53e3e;cursor:pointer;font-size:13px;padding:0;">Arquivar</button>
+            </form>
+            @endif
+          </td>
         </tr>
         @endforeach
       </tbody>

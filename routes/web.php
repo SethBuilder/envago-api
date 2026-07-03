@@ -42,11 +42,13 @@ Route::post('/logout', [AuthController::class, 'logout'])->name('logout')->middl
 Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(function () {
     Route::get('/',                          [AdminDashboard::class, 'index'])->name('dashboard');
     Route::get('/providers',                 [AdminProvider::class,  'index'])->name('providers');
-    Route::get('/providers/{provider}',      [AdminProvider::class,  'show'])->name('providers.show');
+    Route::get('/providers/{provider}',      [AdminProvider::class,  'show'])->name('providers.show')->withTrashed();
     Route::post('/providers/{provider}/approve',          [AdminProvider::class, 'approve'])->name('providers.approve');
     Route::post('/providers/{provider}/reject',           [AdminProvider::class, 'reject'])->name('providers.reject');
     Route::post('/providers/{provider}/impersonate',      [AdminProvider::class, 'impersonate'])->name('providers.impersonate');
-    Route::post('/providers/{provider}/resend-activation', [AdminProvider::class, 'resendActivation'])->name('providers.resend-activation');
+    Route::post('/providers/{provider}/resend-activation',             [AdminProvider::class, 'resendActivation'])->name('providers.resend-activation');
+    Route::delete('/providers/{provider}',                              [AdminProvider::class, 'destroy'])->name('providers.destroy');
+    Route::delete('/providers/{provider}/activities/{activity}',        [AdminProvider::class, 'destroyActivity'])->name('providers.activities.destroy');
     Route::get('/payouts',                              [AdminPayout::class, 'index'])->name('payouts');
     Route::post('/payouts/{schedule}/pay',              [AdminPayout::class, 'pay'])->name('payouts.pay');
     Route::get('/payouts/{payout}/download',            [AdminPayout::class, 'download'])->name('payouts.download');

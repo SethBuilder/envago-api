@@ -29,8 +29,9 @@
       </thead>
       <tbody>
         @foreach($providers as $provider)
-        <tr>
-          <td style="font-weight:500;">{{ $provider->user->name }}</td>
+        @php $deleted = $provider->trashed(); @endphp
+        <tr style="{{ $deleted ? 'opacity:0.4;' : '' }}">
+          <td style="font-weight:500;">{{ $provider->user->name }}{{ $deleted ? ' (arquivado)' : '' }}</td>
           <td>{{ $provider->business_name }}</td>
           <td style="font-size:13px; color:#888;">{{ $provider->user->email }}</td>
           <td style="font-size:13px; color:#aaa;">{{ $provider->created_at->format('d/m/Y') }}</td>
@@ -52,17 +53,19 @@
             {{ match($provider->status) { 'pending' => 'Pendente', 'approved' => 'Aprovado', 'rejected' => 'Rejeitado', default => $provider->status } }}
           </span></td>
           <td style="display:flex; gap:8px; flex-wrap:wrap;">
-            @if($provider->isPending())
-              <form method="POST" action="{{ route('admin.providers.approve', $provider) }}">
-                @csrf
-                <button type="submit" class="btn btn-primary" style="font-size:12px; padding:5px 14px;">Aprovar</button>
-              </form>
-              <form method="POST" action="{{ route('admin.providers.reject', $provider) }}">
-                @csrf
-                <button type="submit" class="btn btn-ghost" style="font-size:12px; padding:5px 14px;">Rejeitar</button>
-              </form>
+            @if(!$deleted)
+              @if($provider->isPending())
+                <form method="POST" action="{{ route('admin.providers.approve', $provider) }}">
+                  @csrf
+                  <button type="submit" class="btn btn-primary" style="font-size:12px; padding:5px 14px;">Aprovar</button>
+                </form>
+                <form method="POST" action="{{ route('admin.providers.reject', $provider) }}">
+                  @csrf
+                  <button type="submit" class="btn btn-ghost" style="font-size:12px; padding:5px 14px;">Rejeitar</button>
+                </form>
+              @endif
+              <a href="{{ route('admin.providers.show', $provider) }}" class="btn btn-ghost" style="font-size:12px; padding:5px 14px;">Ver detalhes</a>
             @endif
-            <a href="{{ route('admin.providers.show', $provider) }}" class="btn btn-ghost" style="font-size:12px; padding:5px 14px;">Ver detalhes</a>
           </td>
         </tr>
         @endforeach

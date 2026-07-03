@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Models\Activity;
 use App\Models\Booking;
 use App\Models\Provider;
 use App\Mail\AccountActivationMail;
@@ -14,7 +15,8 @@ class ProviderController extends Controller
 {
     public function index()
     {
-        $providers = Provider::with('user')
+        $providers = Provider::withTrashed()->with('user')
+            ->orderByRaw('deleted_at IS NOT NULL')
             ->latest()
             ->paginate(25);
 
@@ -23,7 +25,8 @@ class ProviderController extends Controller
 
     public function show(Provider $provider)
     {
-        $provider->load('user', 'activities');
+        $provider->loadMissing('user');
+        $provider->load(['activities' => fn($q) => $q->withTrashed()->orderByRaw('deleted_at IS NOT NULL')->orderBy('id')]);
 
         $activityIds = $provider->activities->pluck('id');
 
@@ -73,6 +76,22 @@ class ProviderController extends Controller
         auth()->loginUsingId($adminId);
 
         return redirect()->route('admin.dashboard');
+    }
+
+    public function destroy(Provider $provider)
+    {
+        $name = $provider->business_name;
+        $provider->delete();
+
+        return redirect()->route('admin.providers')->with('success', "Operador \"{$name}\" arquivado.");
+    }
+
+    public function destroyActivity(Provider $provider, Activity $activity)
+    {
+        $name = $activity->name;
+        $activity->delete();
+
+        return back()->with('success', "Passeio \"{$name}\" arquivado.");
     }
 
     public function resendActivation(Provider $provider)

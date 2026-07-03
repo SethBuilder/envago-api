@@ -3,9 +3,12 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\SoftDeletes;
 
 class Provider extends Model
 {
+    use SoftDeletes;
+
     protected $fillable = ['user_id', 'business_name', 'slug', 'pix_key', 'bank_details', 'logo_url', 'verified_at', 'status', 'whatsapp_number'];
 
     protected static function booted(): void
