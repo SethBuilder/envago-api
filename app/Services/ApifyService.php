@@ -41,8 +41,6 @@ class ApifyService
 
             $item = $items[0];
 
-            Log::info('apify: raw item keys', ['keys' => array_keys($item), 'videoUrl' => $item['videoUrl'] ?? null, 'videoPlaybackUrl' => $item['videoPlaybackUrl'] ?? null, 'musicInfo' => $item['musicInfo'] ?? null, 'coauthorProducers' => null]);
-
             // Video URL — Instagram Reels / videos
             $videoUrl = $item['videoUrl'] ?? $item['video_url'] ?? null;
             if (!$videoUrl) {
@@ -50,11 +48,13 @@ class ApifyService
                 return null;
             }
 
-            $posterUrl        = $item['displayUrl'] ?? $item['thumbnailUrl'] ?? $item['thumbnail_url'] ?? null;
-            $instagramHandle  = $item['ownerUsername'] ?? $item['owner_username'] ?? null;
+            $posterUrl       = $item['displayUrl'] ?? $item['thumbnailUrl'] ?? $item['thumbnail_url'] ?? null;
+            $instagramHandle = $item['ownerUsername'] ?? $item['owner_username'] ?? null;
+            $audioUrl        = $item['audioUrl'] ?? null;
 
             return [
                 'video_url'        => $videoUrl,
+                'audio_url'        => $audioUrl,
                 'poster_url'       => $posterUrl,
                 'instagram_handle' => $instagramHandle,
             ];
@@ -65,10 +65,10 @@ class ApifyService
     }
 
     /**
-     * Download a video URL to local temp storage.
+     * Download a video URL to local temp storage, optionally merging a separate audio stream.
      * Returns the saved filename (basename) or null on failure.
      */
-    public function downloadToTemp(string $videoUrl, string $sessionId, string $prefix = ''): ?string
+    public function downloadToTemp(string $videoUrl, string $sessionId, string $prefix = '', ?string $audioUrl = null): ?string
     {
         try {
             // Check Content-Length before downloading
@@ -90,7 +90,6 @@ class ApifyService
             $filename = ($prefix ? $prefix . '__' : '') . 'video_' . Str::random(8) . '.mp4';
             $dest     = "temp/{$sessionId}/{$filename}";
 
-            // Stream in chunks to avoid memory spike
             $body = $response->body();
             if (strlen($body) > self::MAX_BYTES) {
                 Log::warning('apify: downloaded body exceeds limit');
@@ -99,10 +98,55 @@ class ApifyService
 
             Storage::disk('local')->put($dest, $body);
 
+            // Merge separate audio stream in-place if provided
+            if ($audioUrl) {
+                $this->mergeAudioInPlace(Storage::disk('local')->path($dest), $audioUrl);
+            }
+
             return $filename;
         } catch (\Throwable $e) {
             Log::error('apify: download failed', ['error' => $e->getMessage()]);
             return null;
+        }
+    }
+
+    /**
+     * Download audio from $audioUrl and merge it into $videoPath in-place using FFmpeg.
+     * Falls back to the original video-only file if anything fails.
+     */
+    private function mergeAudioInPlace(string $videoPath, string $audioUrl): void
+    {
+        $audioPath  = dirname($videoPath) . '/audio_' . Str::random(8) . '.aac';
+        $mergedPath = dirname($videoPath) . '/merged_' . Str::random(8) . '.mp4';
+
+        try {
+            $audioResponse = Http::timeout(self::TIMEOUT_SEC)->get($audioUrl);
+            if (!$audioResponse->successful()) return;
+
+            file_put_contents($audioPath, $audioResponse->body());
+
+            $cmd = sprintf(
+                'ffmpeg -i %s -i %s -c:v copy -c:a aac -map 0:v:0 -map 1:a:0 -shortest -y %s 2>&1',
+                escapeshellarg($videoPath),
+                escapeshellarg($audioPath),
+                escapeshellarg($mergedPath)
+            );
+
+            exec($cmd, $output, $exitCode);
+
+            @unlink($audioPath);
+
+            if ($exitCode === 0 && file_exists($mergedPath)) {
+                @unlink($videoPath);
+                rename($mergedPath, $videoPath);
+            } else {
+                @unlink($mergedPath);
+                Log::warning('apify: ffmpeg merge failed', ['exit' => $exitCode, 'tail' => implode("\n", array_slice($output, -5))]);
+            }
+        } catch (\Throwable $e) {
+            @unlink($audioPath);
+            @unlink($mergedPath);
+            Log::error('apify: mergeAudioInPlace exception', ['error' => $e->getMessage()]);
         }
     }
 }

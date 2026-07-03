@@ -97,7 +97,7 @@ class ParceirosController extends Controller
                     $scraped = $apify->scrapeInstagramVideo($igUrl);
                     if ($scraped) {
                         $prefix   = $videoContext ?? $photoContext ?? '';
-                        $filename = $apify->downloadToTemp($scraped['video_url'], $sessionId, $prefix);
+                        $filename = $apify->downloadToTemp($scraped['video_url'], $sessionId, $prefix, $scraped['audio_url'] ?? null);
                         if ($filename) {
                             if ($scraped['poster_url']) {
                                 Storage::disk('local')->put("temp/{$sessionId}/{$filename}.poster", $scraped['poster_url']);

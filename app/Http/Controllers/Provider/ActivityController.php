@@ -166,7 +166,7 @@ class ActivityController extends Controller
             foreach ($igUrls as $igUrl) {
                 $scraped = $apify->scrapeInstagramVideo(trim($igUrl));
                 if ($scraped) {
-                    $filename = $apify->downloadToTemp($scraped['video_url'], $sessionId);
+                    $filename = $apify->downloadToTemp($scraped['video_url'], $sessionId, '', $scraped['audio_url'] ?? null);
                     if ($filename) {
                         if ($scraped['instagram_handle'] ?? null) {
                             Storage::disk('local')->put("temp/{$sessionId}/{$filename}.handle", $scraped['instagram_handle']);
