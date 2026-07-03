@@ -99,9 +99,11 @@ class ParceirosController extends Controller
                         $prefix   = $videoContext ?? $photoContext ?? '';
                         $filename = $apify->downloadToTemp($scraped['video_url'], $sessionId, $prefix);
                         if ($filename) {
-                            // Store poster URL as sidecar file if available
                             if ($scraped['poster_url']) {
                                 Storage::disk('local')->put("temp/{$sessionId}/{$filename}.poster", $scraped['poster_url']);
+                            }
+                            if ($scraped['instagram_handle'] ?? null) {
+                                Storage::disk('local')->put("temp/{$sessionId}/{$filename}.handle", $scraped['instagram_handle']);
                             }
                             $igVideoNotes .= "\n[Vídeo do Instagram salvo: {$igUrl}]";
                         } else {

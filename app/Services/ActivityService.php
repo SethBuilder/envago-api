@@ -9,6 +9,8 @@ use App\Models\Provider;
 use App\Models\Schedule;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 
@@ -191,29 +193,46 @@ class ActivityService
         $stateSlug    = strtolower($activity->state);
 
         foreach ($videos as $video) {
-            $seoName   = "{$providerSlug}-{$nameSlug}-{$citySlug}-{$stateSlug}-video-{$order}";
-            $posterUrl = null;
+            $seoName         = "{$providerSlug}-{$nameSlug}-{$citySlug}-{$stateSlug}-video-{$order}";
+            $posterUrl       = null;
+            $instagramHandle = null;
 
             if ($video instanceof UploadedFile) {
                 $ext  = strtolower($video->getClientOriginalExtension()) ?: 'mp4';
                 $path = $video->storeAs('activities/' . $activity->id, "{$seoName}.{$ext}", ['disk' => 'public']);
             } elseif (is_array($video)) {
-                // From Lara onboarding: ['path' => '/abs/path/to/file.mp4', 'poster_url' => '...']
-                $ext       = strtolower(pathinfo($video['path'], PATHINFO_EXTENSION)) ?: 'mp4';
-                $dest      = 'activities/' . $activity->id . '/' . "{$seoName}.{$ext}";
+                $ext             = strtolower(pathinfo($video['path'], PATHINFO_EXTENSION)) ?: 'mp4';
+                $dest            = 'activities/' . $activity->id . '/' . "{$seoName}.{$ext}";
                 Storage::disk('public')->put($dest, file_get_contents($video['path']));
-                $path      = $dest;
-                $posterUrl = $video['poster_url'] ?? null;
+                $path            = $dest;
+                $instagramHandle = $video['instagram_handle'] ?? null;
+
+                // Download poster from Apify/CDN and store locally so the URL never expires
+                $posterUrl = null;
+                $rawPoster = $video['poster_url'] ?? null;
+                if ($rawPoster && filter_var($rawPoster, FILTER_VALIDATE_URL)) {
+                    try {
+                        $response = Http::timeout(15)->get($rawPoster);
+                        if ($response->successful()) {
+                            $posterDest = 'activities/' . $activity->id . '/' . "{$seoName}-poster.jpg";
+                            Storage::disk('public')->put($posterDest, $response->body());
+                            $posterUrl = $posterDest;
+                        }
+                    } catch (\Throwable $e) {
+                        Log::warning('poster download failed', ['url' => $rawPoster, 'err' => $e->getMessage()]);
+                    }
+                }
             } else {
                 continue;
             }
 
             Media::create([
-                'activity_id' => $activity->id,
-                'url'         => $path,
-                'poster_url'  => $posterUrl,
-                'type'        => 'video',
-                'order'       => $order++,
+                'activity_id'      => $activity->id,
+                'url'              => $path,
+                'poster_url'       => $posterUrl,
+                'instagram_handle' => $instagramHandle,
+                'type'             => 'video',
+                'order'            => $order++,
             ]);
         }
     }

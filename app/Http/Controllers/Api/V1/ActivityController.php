@@ -104,8 +104,9 @@ class ActivityController extends Controller
                 'cover_url'        => $activity->media->where('type', 'cover')->first()?->url,
                 'gallery'          => $activity->media->where('type', 'gallery')->map(fn($m) => $m->url)->values(),
                 'videos'           => $activity->media->where('type', 'video')->map(fn($m) => [
-                    'url'        => $m->url,
-                    'poster_url' => $m->poster_url,
+                    'url'              => $m->url,
+                    'poster_url'       => $m->poster_url,
+                    'instagram_handle' => $m->instagram_handle,
                 ])->values(),
                 'meeting_point'    => $activity->meeting_point,
                 'meeting_point_lat'=> $activity->meeting_point_lat,

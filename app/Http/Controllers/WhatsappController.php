@@ -31,12 +31,19 @@ class WhatsappController extends Controller
     {
         $message = $request->input('entry.0.changes.0.value.messages.0');
 
-        if (!$message || ($message['type'] ?? '') !== 'text') {
+        $type = $message['type'] ?? '';
+
+        if (!$message || !in_array($type, ['text', 'interactive'])) {
             return response()->json(['status' => 'ok']);
         }
 
         $from = $message['from'];
-        $body = trim($message['text']['body'] ?? '');
+
+        if ($type === 'interactive') {
+            $body = $message['interactive']['button_reply']['title'] ?? '';
+        } else {
+            $body = trim($message['text']['body'] ?? '');
+        }
 
         if (!$from || !$body) {
             return response()->json(['status' => 'ok']);
@@ -86,6 +93,9 @@ class WhatsappController extends Controller
                     if ($filename) {
                         if ($scraped['poster_url']) {
                             Storage::disk('local')->put("temp/{$sessionId}/{$filename}.poster", $scraped['poster_url']);
+                        }
+                        if ($scraped['instagram_handle'] ?? null) {
+                            Storage::disk('local')->put("temp/{$sessionId}/{$filename}.handle", $scraped['instagram_handle']);
                         }
                         $igVideoNotes .= "\n[Vídeo do Instagram salvo: {$igUrl}]";
                     } else {

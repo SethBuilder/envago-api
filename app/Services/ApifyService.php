@@ -48,12 +48,13 @@ class ApifyService
                 return null;
             }
 
-            // Poster: displayUrl is the cover frame Instagram generates
-            $posterUrl = $item['displayUrl'] ?? $item['thumbnailUrl'] ?? $item['thumbnail_url'] ?? null;
+            $posterUrl        = $item['displayUrl'] ?? $item['thumbnailUrl'] ?? $item['thumbnail_url'] ?? null;
+            $instagramHandle  = $item['ownerUsername'] ?? $item['owner_username'] ?? null;
 
             return [
-                'video_url'  => $videoUrl,
-                'poster_url' => $posterUrl,
+                'video_url'        => $videoUrl,
+                'poster_url'       => $posterUrl,
+                'instagram_handle' => $instagramHandle,
             ];
         } catch (\Throwable $e) {
             Log::error('apify: exception', ['error' => $e->getMessage(), 'url' => $url]);

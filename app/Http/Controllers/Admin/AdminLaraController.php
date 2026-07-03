@@ -331,10 +331,13 @@ class AdminLaraController extends Controller
 
         $gaql = $queries[$reportType] ?? $queries['campaigns'];
 
+        $managerId = config('services.google.ads.manager_id');
+
         $response = Http::timeout(30)->withHeaders([
-            'Authorization'   => 'Bearer ' . $accessToken,
-            'developer-token' => $devToken,
-        ])->post("https://googleads.googleapis.com/v18/customers/{$customerId}/googleAds:search", [
+            'Authorization'      => 'Bearer ' . $accessToken,
+            'developer-token'    => $devToken,
+            'login-customer-id'  => $managerId,
+        ])->post("https://googleads.googleapis.com/v17/customers/{$customerId}/googleAds:search", [
             'query' => $gaql,
         ]);
 

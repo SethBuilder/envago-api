@@ -153,6 +153,8 @@ class ActivityController extends Controller
             'videos.*.max'              => 'Um dos vídeos passou de 100 MB.',
         ]);
 
+        set_time_limit(180);
+
         $newPhotos      = $request->hasFile('photos') ? $request->file('photos') : [];
         $deleteMediaIds = $request->input('delete_media', []);
         $newVideos      = $request->hasFile('videos') ? $request->file('videos') : [];
@@ -166,9 +168,13 @@ class ActivityController extends Controller
                 if ($scraped) {
                     $filename = $apify->downloadToTemp($scraped['video_url'], $sessionId);
                     if ($filename) {
+                        if ($scraped['instagram_handle'] ?? null) {
+                            Storage::disk('local')->put("temp/{$sessionId}/{$filename}.handle", $scraped['instagram_handle']);
+                        }
                         $newVideos[] = [
-                            'path'       => Storage::disk('local')->path("temp/{$sessionId}/{$filename}"),
-                            'poster_url' => $scraped['poster_url'] ?? null,
+                            'path'             => Storage::disk('local')->path("temp/{$sessionId}/{$filename}"),
+                            'poster_url'       => $scraped['poster_url'] ?? null,
+                            'instagram_handle' => $scraped['instagram_handle'] ?? null,
                         ];
                     }
                 }

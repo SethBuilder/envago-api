@@ -141,14 +141,19 @@ class OnboardingService
                 Log::warning("onboarding: temp video not found", ['session' => $sessionId, 'file' => $filename]);
                 continue;
             }
-            $posterPath = $relative . '.poster';
-            $posterUrl  = Storage::disk('local')->exists($posterPath)
+            $posterPath       = $relative . '.poster';
+            $handlePath       = $relative . '.handle';
+            $posterUrl        = Storage::disk('local')->exists($posterPath)
                 ? trim(Storage::disk('local')->get($posterPath))
+                : null;
+            $instagramHandle  = Storage::disk('local')->exists($handlePath)
+                ? trim(Storage::disk('local')->get($handlePath))
                 : null;
 
             $videos[] = [
-                'path'       => Storage::disk('local')->path($relative),
-                'poster_url' => $posterUrl,
+                'path'             => Storage::disk('local')->path($relative),
+                'poster_url'       => $posterUrl,
+                'instagram_handle' => $instagramHandle,
             ];
         }
         return $videos;

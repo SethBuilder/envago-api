@@ -375,7 +375,7 @@ PROMPT;
 
     private function parceirosOpening(): string
     {
-        return "Olá. Bem-vindo ao Envago — a plataforma onde turistas encontram e reservam passeios no Brasil.\n\nCriamos sua página gratuitamente e cuidamos dos anúncios no Google e Instagram para trazer os turistas até você.\n\nPara começar, me manda a lista de passeios que você oferece com os preços. Pode ser planilha, foto, PDF ou digita aqui mesmo.";
+        return "Olá, aqui é a Lara do Envago.\n\nEnvago é um site onde turistas encontram e reservam passeios no Brasil. A gente cria sua página de graça e roda anúncio no Google pra trazer os clientes até você — só cobramos 10% por reserva.\n\nSe quiser, me manda sua lista de passeios com preço e eu crio sua página agora. Pode ser planilha, foto, PDF ou digita aqui mesmo. Obrigada pela atenção.";
     }
 
     private function websiteOpening(): string
