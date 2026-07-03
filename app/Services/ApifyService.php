@@ -41,6 +41,8 @@ class ApifyService
 
             $item = $items[0];
 
+            Log::info('apify: raw item keys', ['keys' => array_keys($item), 'videoUrl' => $item['videoUrl'] ?? null, 'videoPlaybackUrl' => $item['videoPlaybackUrl'] ?? null, 'musicInfo' => $item['musicInfo'] ?? null, 'coauthorProducers' => null]);
+
             // Video URL — Instagram Reels / videos
             $videoUrl = $item['videoUrl'] ?? $item['video_url'] ?? null;
             if (!$videoUrl) {
