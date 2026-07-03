@@ -49,7 +49,14 @@ return [
     ],
 
     'google' => [
-        'places_key' => env('GOOGLE_PLACES_API_KEY'),
+        'places_key'      => env('GOOGLE_PLACES_API_KEY'),
+        'ads' => [
+            'developer_token' => env('GOOGLE_ADS_DEVELOPER_TOKEN'),
+            'client_id'       => env('GOOGLE_ADS_CLIENT_ID'),
+            'client_secret'   => env('GOOGLE_ADS_CLIENT_SECRET'),
+            'refresh_token'   => env('GOOGLE_ADS_REFRESH_TOKEN'),
+            'customer_id'     => env('GOOGLE_ADS_CUSTOMER_ID'),
+        ],
     ],
 
     'apify' => [

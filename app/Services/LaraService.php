@@ -172,6 +172,7 @@ Strategic thinking partner and operational assistant. Help Seif understand:
 - Business performance: bookings, revenue, growth trends
 - What operators are asking Lara during onboarding (common issues, knowledge gaps)
 - Market intelligence from outside-scope leads (services not yet covered by Envago)
+- Google Ads performance: impressions, clicks, CPC, search terms, conversion rates — use query_google_ads
 - Operational issues: pending approvals, missing bank details, payout status
 - How Lara should respond to providers and tourists via save_instruction
 
@@ -305,6 +306,26 @@ PROMPT;
                     'permanent' => ['type' => 'boolean', 'description' => 'If true, permanently delete. If false (default), just deactivate.'],
                 ],
                 'required' => ['id'],
+            ],
+        ],
+        [
+            'name'         => 'query_google_ads',
+            'description'  => 'Fetch Google Ads performance data for Envago campaigns. Returns impressions, clicks, CPC, cost, and conversions. Use this whenever Seif asks about ad performance, search terms, keywords, or campaign results.',
+            'input_schema' => [
+                'type'       => 'object',
+                'properties' => [
+                    'report_type' => [
+                        'type'        => 'string',
+                        'description' => 'campaigns = overall campaign metrics | search_terms = what users searched before clicking | keywords = keyword-level performance',
+                        'enum'        => ['campaigns', 'search_terms', 'keywords'],
+                    ],
+                    'period' => [
+                        'type'        => 'string',
+                        'description' => 'Time window for the report (default: LAST_7_DAYS)',
+                        'enum'        => ['LAST_7_DAYS', 'LAST_30_DAYS', 'THIS_MONTH', 'LAST_MONTH'],
+                    ],
+                ],
+                'required' => ['report_type'],
             ],
         ],
         [

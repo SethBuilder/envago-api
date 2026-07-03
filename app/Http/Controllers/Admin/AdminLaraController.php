@@ -81,6 +81,7 @@ class AdminLaraController extends Controller
                 'save_instruction'     => $this->toolSaveInstruction($input),
                 'list_instructions'    => $this->toolListInstructions($input),
                 'delete_instruction'   => $this->toolDeleteInstruction($input),
+                'query_google_ads'     => $this->toolQueryGoogleAds($input),
                 'generate_creative'    => $this->toolGenerateCreative($input),
                 'create_meta_ad'       => $this->toolCreateMetaAd($input),
                 default                => "Unknown tool: {$name}",
@@ -298,6 +299,100 @@ class AdminLaraController extends Controller
 
         DB::table('lara_instructions')->where('id', $id)->update(['active' => false, 'updated_at' => now()]);
         return "Instruction #{$id} deactivated.";
+    }
+
+    private function googleAdsAccessToken(): ?string
+    {
+        $response = Http::asForm()->post('https://oauth2.googleapis.com/token', [
+            'client_id'     => config('services.google.ads.client_id'),
+            'client_secret' => config('services.google.ads.client_secret'),
+            'refresh_token' => config('services.google.ads.refresh_token'),
+            'grant_type'    => 'refresh_token',
+        ]);
+
+        return $response->json('access_token');
+    }
+
+    private function toolQueryGoogleAds(array $input): string
+    {
+        $reportType  = $input['report_type'] ?? 'campaigns';
+        $period      = $input['period'] ?? 'LAST_7_DAYS';
+        $customerId  = config('services.google.ads.customer_id');
+        $devToken    = config('services.google.ads.developer_token');
+
+        $accessToken = $this->googleAdsAccessToken();
+        if (!$accessToken) return 'Error: could not get Google Ads access token.';
+
+        $queries = [
+            'campaigns'    => "SELECT campaign.name, metrics.impressions, metrics.clicks, metrics.cost_micros, metrics.conversions, metrics.ctr, metrics.average_cpc FROM campaign WHERE segments.date DURING {$period} AND campaign.status != 'REMOVED' ORDER BY metrics.clicks DESC",
+            'search_terms' => "SELECT search_term_view.search_term, metrics.impressions, metrics.clicks, metrics.conversions, metrics.cost_micros FROM search_term_view WHERE segments.date DURING {$period} ORDER BY metrics.clicks DESC LIMIT 25",
+            'keywords'     => "SELECT ad_group_criterion.keyword.text, metrics.impressions, metrics.clicks, metrics.cost_micros, metrics.conversions, metrics.average_cpc FROM keyword_view WHERE segments.date DURING {$period} AND campaign.status != 'REMOVED' ORDER BY metrics.clicks DESC LIMIT 25",
+        ];
+
+        $gaql = $queries[$reportType] ?? $queries['campaigns'];
+
+        $response = Http::timeout(30)->withHeaders([
+            'Authorization'   => 'Bearer ' . $accessToken,
+            'developer-token' => $devToken,
+        ])->post("https://googleads.googleapis.com/v18/customers/{$customerId}/googleAds:search", [
+            'query' => $gaql,
+        ]);
+
+        if (!$response->successful()) {
+            Log::error('admin_lara: google ads api error', ['status' => $response->status(), 'body' => substr($response->body(), 0, 500)]);
+            return 'Google Ads API error: ' . $response->status() . ' — ' . substr($response->body(), 0, 300);
+        }
+
+        $results = $response->json('results') ?? [];
+        if (empty($results)) return "No data found for {$reportType} in {$period}.";
+
+        $lines = match ($reportType) {
+            'campaigns' => collect($results)->map(function ($r) {
+                $m    = $r['metrics'];
+                $cost = isset($m['costMicros']) ? 'R$' . number_format($m['costMicros'] / 1_000_000, 2) : 'R$0';
+                $cpc  = isset($m['averageCpc']) ? 'R$' . number_format($m['averageCpc'] / 1_000_000, 2) : '—';
+                $ctr  = isset($m['ctr']) ? round($m['ctr'] * 100, 1) . '%' : '—';
+                return implode(' | ', [
+                    $r['campaign']['name'],
+                    ($m['impressions'] ?? 0) . ' impressions',
+                    ($m['clicks'] ?? 0) . ' clicks',
+                    'CTR ' . $ctr,
+                    'CPC ' . $cpc,
+                    'cost ' . $cost,
+                    round($m['conversions'] ?? 0, 1) . ' conversions',
+                ]);
+            })->join("\n"),
+
+            'search_terms' => collect($results)->map(function ($r) {
+                $m    = $r['metrics'];
+                $cost = isset($m['costMicros']) ? 'R$' . number_format($m['costMicros'] / 1_000_000, 2) : 'R$0';
+                return implode(' | ', [
+                    '"' . $r['searchTermView']['searchTerm'] . '"',
+                    ($m['impressions'] ?? 0) . ' impressions',
+                    ($m['clicks'] ?? 0) . ' clicks',
+                    round($m['conversions'] ?? 0, 1) . ' conversions',
+                    'cost ' . $cost,
+                ]);
+            })->join("\n"),
+
+            'keywords' => collect($results)->map(function ($r) {
+                $m    = $r['metrics'];
+                $cpc  = isset($m['averageCpc']) ? 'R$' . number_format($m['averageCpc'] / 1_000_000, 2) : '—';
+                $cost = isset($m['costMicros']) ? 'R$' . number_format($m['costMicros'] / 1_000_000, 2) : 'R$0';
+                return implode(' | ', [
+                    '"' . ($r['adGroupCriterion']['keyword']['text'] ?? '?') . '"',
+                    ($m['impressions'] ?? 0) . ' impressions',
+                    ($m['clicks'] ?? 0) . ' clicks',
+                    'CPC ' . $cpc,
+                    'cost ' . $cost,
+                    round($m['conversions'] ?? 0, 1) . ' conversions',
+                ]);
+            })->join("\n"),
+
+            default => 'Unknown report type.',
+        };
+
+        return "Google Ads — {$reportType} — {$period}:\n\n{$lines}";
     }
 
     private function toolGenerateCreative(array $input): string
