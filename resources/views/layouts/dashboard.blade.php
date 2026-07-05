@@ -214,7 +214,7 @@
       <div style="padding:8px 12px 2px;font-size:10px;color:#ccc;letter-spacing:1px;text-transform:uppercase;font-weight:600;">Lara</div>
       <a href="{{ route('admin.lara.chat') }}" class="nav-item {{ request()->routeIs('admin.lara.chat') ? 'active' : '' }}">
         <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
-        Chat
+        Lara
       </a>
       <a href="{{ route('admin.lara.conversations') }}" class="nav-item {{ request()->routeIs('admin.lara.conversations*') ? 'active' : '' }}">
         <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M17 8h2a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-8a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="6" rx="1"/></svg>
