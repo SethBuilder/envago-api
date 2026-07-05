@@ -12,13 +12,13 @@ class LaraConversationsController extends Controller
         $sessions = DB::table('lara_conversations as lc')
             ->select([
                 'lc.session_id',
-                DB::raw('MIN(lc.created_at) as started_at'),
+                DB::raw('MAX(lc.created_at) as last_message_at'),
                 DB::raw('COUNT(*) as message_count'),
                 DB::raw('(SELECT lc2.message FROM lara_conversations lc2 WHERE lc2.session_id = lc.session_id AND lc2.role = "user" ORDER BY lc2.created_at ASC LIMIT 1) as first_user_message'),
             ])
             ->where('lc.session_id', 'not like', 'admin_%')
             ->groupBy('lc.session_id')
-            ->orderByDesc(DB::raw('MIN(lc.created_at)'))
+            ->orderByDesc(DB::raw('MAX(lc.created_at)'))
             ->paginate(30);
 
         return view('admin.lara-conversations', compact('sessions'));

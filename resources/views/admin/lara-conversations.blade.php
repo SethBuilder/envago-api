@@ -30,7 +30,7 @@
           {{ $session->first_user_message ? Str::limit($session->first_user_message, 80) : '—' }}
         </td>
         <td style="color:#888;font-size:13px;">{{ $session->message_count }}</td>
-        <td style="color:#aaa;font-size:13px;">{{ \Carbon\Carbon::parse($session->started_at)->format('d/m/Y H:i') }}</td>
+        <td style="color:#aaa;font-size:13px;">{{ \Carbon\Carbon::parse($session->last_message_at)->format('d/m/Y H:i') }}</td>
         <td>
           <a href="{{ route('admin.lara.conversations.show', $session->session_id) }}" class="btn btn-ghost" style="font-size:12px;padding:5px 12px;">Ver</a>
         </td>
