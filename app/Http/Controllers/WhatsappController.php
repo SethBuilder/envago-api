@@ -33,13 +33,20 @@ class WhatsappController extends Controller
 
         $type = $message['type'] ?? '';
 
-        if (!$message || !in_array($type, ['text', 'interactive'])) {
+        if (!$message) {
             return response()->json(['status' => 'ok']);
         }
 
         $from = $message['from'];
 
-        if ($type === 'interactive') {
+        if (!in_array($type, ['text', 'interactive', 'image', 'document'])) {
+            return response()->json(['status' => 'ok']);
+        }
+
+        if (in_array($type, ['image', 'document'])) {
+            $caption = trim($message[$type]['caption'] ?? '');
+            $body    = $caption ?: '[operador enviou uma ' . ($type === 'image' ? 'foto' : 'arquivo') . ']';
+        } elseif ($type === 'interactive') {
             $body = $message['interactive']['button_reply']['title'] ?? '';
         } else {
             $body = trim($message['text']['body'] ?? '');

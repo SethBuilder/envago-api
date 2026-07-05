@@ -432,24 +432,14 @@ class AdminLaraController extends Controller
 
         if (!$pageId) return 'Error: FACEBOOK_PAGE_ID not configured.';
 
-        // Upload image from URL to Meta
-        $imgRes   = Http::timeout(30)->post("{$base}/{$accountId}/adimages", [
-            'url'          => $input['image_url'],
-            'access_token' => $token,
-        ]);
-        $imageHash = collect($imgRes->json('images'))->first()['hash'] ?? null;
-        if (!$imageHash) {
-            Log::error('admin_lara: image upload failed', ['body' => substr($imgRes->body(), 0, 300)]);
-            return 'Error uploading image to Meta: ' . $imgRes->body();
-        }
-
         // Create campaign (PAUSED)
-        $campRes = Http::timeout(15)->post("{$base}/{$accountId}/campaigns", [
-            'name'                  => $input['campaign_name'],
-            'objective'             => $input['objective'],
-            'status'                => 'PAUSED',
-            'special_ad_categories' => [],
-            'access_token'          => $token,
+        $campRes = Http::timeout(15)->asForm()->post("{$base}/{$accountId}/campaigns", [
+            'name'                           => $input['campaign_name'],
+            'objective'                      => $input['objective'],
+            'status'                         => 'PAUSED',
+            'special_ad_categories'          => 'NONE',
+            'is_adset_budget_sharing_enabled' => 'false',
+            'access_token'                   => $token,
         ]);
         $campaignId = $campRes->json('id');
         if (!$campaignId) return 'Error creating campaign: ' . $campRes->body();
@@ -457,25 +447,33 @@ class AdminLaraController extends Controller
         // Create ad set (PAUSED)
         $budgetCents  = (int) round(($input['daily_budget_brl'] ?? 50) * 100);
         $optimGoal    = ($input['objective'] === 'OUTCOME_LEADS') ? 'LEAD_GENERATION' : 'LINK_CLICKS';
-        $adSetRes = Http::timeout(15)->post("{$base}/{$accountId}/adsets", [
+        $adSetRes = Http::timeout(15)->asForm()->post("{$base}/{$accountId}/adsets", [
             'name'              => $input['campaign_name'] . ' — Ad Set',
             'campaign_id'       => $campaignId,
             'daily_budget'      => $budgetCents,
             'billing_event'     => 'IMPRESSIONS',
             'optimization_goal' => $optimGoal,
+            'bid_strategy'      => 'LOWEST_COST_WITHOUT_CAP',
             'targeting'         => json_encode([
-                'geo_locations' => ['countries' => ['BR']],
-                'age_min'       => $input['targeting_age_min'] ?? 25,
-                'age_max'       => $input['targeting_age_max'] ?? 55,
+                'geo_locations' => [
+                    'countries'      => ['BR'],
+                    'location_types' => ['home', 'recent'],
+                ],
+                'age_min'              => $input['targeting_age_min'] ?? 25,
+                'age_max'              => $input['targeting_age_max'] ?? 55,
+                'targeting_automation' => ['advantage_audience' => 0],
             ]),
             'status'            => 'PAUSED',
             'access_token'      => $token,
         ]);
         $adSetId = $adSetRes->json('id');
-        if (!$adSetId) return 'Error creating ad set: ' . $adSetRes->body();
+        if (!$adSetId) {
+            Log::error('admin_lara: adset creation failed', ['body' => substr($adSetRes->body(), 0, 500)]);
+            return 'Error creating ad set: ' . $adSetRes->body();
+        }
 
-        // Create ad creative
-        $creativeRes = Http::timeout(15)->post("{$base}/{$accountId}/adcreatives", [
+        // Create ad creative (use image_url directly, no pre-upload needed)
+        $creativeRes = Http::timeout(15)->asForm()->post("{$base}/{$accountId}/adcreatives", [
             'name'              => $input['campaign_name'] . ' — Creative',
             'object_story_spec' => json_encode([
                 'page_id'   => $pageId,
@@ -483,17 +481,20 @@ class AdminLaraController extends Controller
                     'link'           => $input['destination_url'],
                     'message'        => $input['body'],
                     'name'           => $input['headline'],
-                    'image_hash'     => $imageHash,
+                    'picture'        => $input['image_url'],
                     'call_to_action' => ['type' => 'LEARN_MORE'],
                 ],
             ]),
             'access_token'      => $token,
         ]);
         $creativeId = $creativeRes->json('id');
-        if (!$creativeId) return 'Error creating creative: ' . $creativeRes->body();
+        if (!$creativeId) {
+            Log::error('admin_lara: creative creation failed', ['body' => substr($creativeRes->body(), 0, 500)]);
+            return 'Error creating creative: ' . $creativeRes->body();
+        }
 
         // Create ad (PAUSED)
-        $adRes = Http::timeout(15)->post("{$base}/{$accountId}/ads", [
+        $adRes = Http::timeout(15)->asForm()->post("{$base}/{$accountId}/ads", [
             'name'         => $input['campaign_name'] . ' — Ad',
             'adset_id'     => $adSetId,
             'creative'     => json_encode(['creative_id' => $creativeId]),
