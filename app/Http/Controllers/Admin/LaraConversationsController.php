@@ -4,11 +4,15 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 
 class LaraConversationsController extends Controller
 {
     public function index()
     {
+        $rawCount = DB::table('lara_conversations')->count();
+        Log::info('conversations.index', ['total_rows' => $rawCount]);
+
         $sessions = DB::table('lara_conversations as lc')
             ->select([
                 'lc.session_id',
@@ -20,6 +24,8 @@ class LaraConversationsController extends Controller
             ->groupBy('lc.session_id')
             ->orderByDesc(DB::raw('MIN(lc.created_at)'))
             ->paginate(30);
+
+        Log::info('conversations.query', ['sessions_count' => $sessions->total()]);
 
         return view('admin.lara-conversations', compact('sessions'));
     }
