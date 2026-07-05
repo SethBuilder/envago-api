@@ -29,28 +29,17 @@ class WhatsappController extends Controller
 
     public function webhook(Request $request, LaraService $lara): JsonResponse
     {
-        $payload = $request->all();
         $message = $request->input('entry.0.changes.0.value.messages.0');
 
         $type = $message['type'] ?? '';
 
         if (!$message) {
-            $field   = $request->input('entry.0.changes.0.field');
-            $statuses = $request->input('entry.0.changes.0.value.statuses.0.status');
-            Log::info('whatsapp.no_message', [
-                'field'   => $field,
-                'status'  => $statuses,
-                'keys'    => array_keys($request->input('entry.0.changes.0.value', [])),
-            ]);
             return response()->json(['status' => 'ok']);
         }
 
         $from = $message['from'];
 
-        Log::info('whatsapp.message_received', ['from' => $from, 'type' => $type]);
-
         if (!in_array($type, ['text', 'interactive', 'image', 'document'])) {
-            Log::info('whatsapp.unsupported_type', ['type' => $type]);
             return response()->json(['status' => 'ok']);
         }
 
@@ -127,8 +116,6 @@ class WhatsappController extends Controller
 
         $messageToLara = trim($body . $igVideoNotes) ?: $body;
 
-        Log::info('whatsapp.calling_lara', ['session' => $sessionId, 'body' => substr($body, 0, 80)]);
-
         try {
             $reply = $lara->respond(
                 $history->all(),
@@ -137,12 +124,10 @@ class WhatsappController extends Controller
                 $providerInfo
             );
         } catch (\Throwable $e) {
-            Log::error('whatsapp.lara_error', ['phone' => $from, 'error' => $e->getMessage(), 'trace' => substr($e->getTraceAsString(), 0, 500)]);
+            Log::error('whatsapp.lara_error', ['phone' => $from, 'error' => $e->getMessage()]);
             self::sendMessage($from, 'Algo deu errado. Tente novamente em instantes.');
             return response()->json(['status' => 'ok']);
         }
-
-        Log::info('whatsapp.lara_ok', ['session' => $sessionId, 'reply_len' => strlen($reply)]);
 
         $displayReply = $reply;
         foreach (['{"action":"confirmed"', '{"action":"onboard"', '{"action":"outside_scope"', '{"action":"misuse"'] as $marker) {
@@ -160,8 +145,6 @@ class WhatsappController extends Controller
             ['session_id' => $sessionId, 'uuid' => $sessionId, 'role' => 'user',      'message' => $body,         'created_at' => now(), 'updated_at' => now()],
             ['session_id' => $sessionId, 'uuid' => $sessionId, 'role' => 'assistant', 'message' => $displayReply, 'created_at' => now(), 'updated_at' => now()],
         ]);
-
-        Log::info('whatsapp.saved', ['session' => $sessionId]);
 
         self::sendMessage($from, $displayReply);
 
