@@ -56,9 +56,29 @@
     border-radius: 14px;
     font-size: 14px;
     line-height: 1.6;
-    white-space: pre-wrap;
     word-break: break-word;
   }
+  .lara-msg.assistant .lara-bubble p { margin: 0 0 8px; }
+  .lara-msg.assistant .lara-bubble p:last-child { margin-bottom: 0; }
+  .lara-msg.assistant .lara-bubble ul,
+  .lara-msg.assistant .lara-bubble ol { padding-left: 20px; margin: 6px 0; }
+  .lara-msg.assistant .lara-bubble li { margin: 3px 0; }
+  .lara-msg.assistant .lara-bubble strong { font-weight: 600; }
+  .lara-msg.assistant .lara-bubble em { font-style: italic; }
+  .lara-msg.assistant .lara-bubble h1,
+  .lara-msg.assistant .lara-bubble h2,
+  .lara-msg.assistant .lara-bubble h3 { font-weight: 600; margin: 10px 0 4px; font-size: 14px; }
+  .lara-msg.assistant .lara-bubble code {
+    background: #f0ede8; border-radius: 4px; padding: 1px 5px;
+    font-family: monospace; font-size: 12px;
+  }
+  .lara-msg.assistant .lara-bubble pre {
+    background: #f0ede8; border-radius: 8px; padding: 10px 12px;
+    overflow-x: auto; margin: 6px 0;
+  }
+  .lara-msg.assistant .lara-bubble pre code { background: none; padding: 0; }
+  .lara-msg.assistant .lara-bubble hr { border: none; border-top: 1px solid #ece9e4; margin: 10px 0; }
+  .lara-msg.assistant .lara-bubble a { color: #111; text-decoration: underline; }
   .lara-msg.user .lara-bubble {
     background: #111;
     color: #fff;
@@ -175,15 +195,19 @@
 @endsection
 
 @push('scripts')
+<script src="https://cdn.jsdelivr.net/npm/marked@12/marked.min.js"></script>
 <script>
 (function () {
   var thinking = false;
 
+  marked.setOptions({ breaks: true, gfm: true });
+
   function renderBubble(text) {
-    var html = text.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
-    html = html.replace(/\[IMAGE:(https?:\/\/[^\]]+)\]/g, function(_, url) {
-      return '<img src="' + url + '" style="max-width:100%;border-radius:10px;margin-top:8px;display:block;" onerror="this.style.display=\'none\'">';
-    });
+    var processed = text.replace(/\[IMAGE:(https?:\/\/[^\]]+)\]/g, '![]($1)');
+    var html = marked.parse(processed);
+    // Fix image style
+    html = html.replace(/<img src="(https?:\/\/[^"]+)"/g,
+      '<img src="$1" style="max-width:100%;border-radius:10px;margin-top:8px;display:block;" onerror="this.style.display=\'none\'"');
     return html;
   }
 
