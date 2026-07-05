@@ -29,11 +29,19 @@ class WhatsappController extends Controller
 
     public function webhook(Request $request, LaraService $lara): JsonResponse
     {
+        $payload = $request->all();
         $message = $request->input('entry.0.changes.0.value.messages.0');
 
         $type = $message['type'] ?? '';
 
         if (!$message) {
+            $field   = $request->input('entry.0.changes.0.field');
+            $statuses = $request->input('entry.0.changes.0.value.statuses.0.status');
+            Log::info('whatsapp.no_message', [
+                'field'   => $field,
+                'status'  => $statuses,
+                'keys'    => array_keys($request->input('entry.0.changes.0.value', [])),
+            ]);
             return response()->json(['status' => 'ok']);
         }
 
