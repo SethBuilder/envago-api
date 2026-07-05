@@ -557,7 +557,8 @@ class AdminLaraController extends Controller
             ]);
         })->join("\n");
 
-        return "Meta campaigns — {$preset} ({$res->json('data') ? count($campaigns) : 0} found):\n\n{$lines}";
+        $count = count($campaigns);
+        return "Meta campaigns — {$preset} ({$count} found):\n\n{$lines}";
     }
 
     private function toolGetMetaInsights(array $input): string
