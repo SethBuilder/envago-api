@@ -187,6 +187,23 @@ When Seif says "when providers ask about X, say Y" or "tell Lara to always say Z
 
 To see or manage existing instructions, use list_instructions or delete_instruction.
 
+## Meta Ads Analytics
+When Seif asks about campaign performance, active campaigns, spend, CTR, CPM, or similar:
+- Call list_meta_campaigns to get an overview across all campaigns
+- Call get_meta_insights to drill into a specific campaign or segment by age/gender/country
+- After fetching, synthesize: highlight what's working, what's underperforming, and why
+- Suggest actionable improvements (pause low-CTR campaigns, increase budget on winners, enable Advantage+)
+
+## Meta Campaign Editing
+When Seif wants to pause, activate, or change a budget:
+1. Confirm with him: "I'll set campaign X to PAUSED — confirm?"
+2. Call edit_meta_campaign only after confirmation
+3. Report the result clearly
+
+For Advantage+ audience recommendations:
+- Explain the trade-off (broader reach vs less control) before enabling
+- Call edit_meta_campaign with enable_advantage_plus=true on the adset after Seif confirms
+
 ## Meta Ad Creation — Two-Step Flow
 When Seif asks to create an ad:
 
@@ -356,6 +373,46 @@ PROMPT;
                     'targeting_age_max' => ['type' => 'integer', 'description' => 'Max age (default 55)'],
                 ],
                 'required' => ['campaign_name', 'objective', 'daily_budget_brl', 'headline', 'body', 'image_url', 'destination_url'],
+            ],
+        ],
+        [
+            'name'        => 'list_meta_campaigns',
+            'description' => 'List all Meta ad campaigns with their status, daily budget, and performance metrics (spend, impressions, clicks, CTR, CPM, CPC, frequency) for a given date preset. Use this to give Seif an overview of active campaigns.',
+            'input_schema' => [
+                'type'       => 'object',
+                'properties' => [
+                    'date_preset' => ['type' => 'string', 'description' => 'Date range: today, yesterday, last_7_days (default), last_14_days, last_30_days, last_month, this_month'],
+                ],
+                'required' => [],
+            ],
+        ],
+        [
+            'name'        => 'get_meta_insights',
+            'description' => 'Get detailed Meta ads performance insights at account, campaign, or ad set level with optional breakdowns by age, gender, or country. Use this to drill into a specific campaign or identify audience segments.',
+            'input_schema' => [
+                'type'       => 'object',
+                'properties' => [
+                    'date_preset' => ['type' => 'string', 'description' => 'Date range: last_7_days, last_14_days, last_30_days (default), last_month, this_month'],
+                    'level'       => ['type' => 'string', 'description' => 'Aggregation level: account, campaign (default), adset'],
+                    'entity_id'   => ['type' => 'string', 'description' => 'Specific campaign or adset ID to query (omit for all campaigns in account)'],
+                    'breakdown'   => ['type' => 'string', 'description' => 'Optional breakdown: age, gender, country, or "age,gender"'],
+                ],
+                'required' => [],
+            ],
+        ],
+        [
+            'name'        => 'edit_meta_campaign',
+            'description' => 'Edit a Meta campaign or ad set: change status (ACTIVE/PAUSED), update daily budget, or enable/disable Advantage+ audience targeting. Confirm changes with Seif before calling.',
+            'input_schema' => [
+                'type'       => 'object',
+                'properties' => [
+                    'entity_id'             => ['type' => 'string',  'description' => 'Campaign or ad set ID to edit'],
+                    'entity_type'           => ['type' => 'string',  'description' => 'campaign or adset'],
+                    'status'                => ['type' => 'string',  'description' => 'New status: ACTIVE or PAUSED'],
+                    'daily_budget_brl'      => ['type' => 'number',  'description' => 'New daily budget in BRL'],
+                    'enable_advantage_plus' => ['type' => 'boolean', 'description' => 'Enable (true) or disable (false) Advantage+ audience on an ad set'],
+                ],
+                'required' => ['entity_id'],
             ],
         ],
     ];

@@ -84,6 +84,9 @@ class AdminLaraController extends Controller
                 'query_google_ads'     => $this->toolQueryGoogleAds($input),
                 'generate_creative'    => $this->toolGenerateCreative($input),
                 'create_meta_ad'       => $this->toolCreateMetaAd($input),
+                'list_meta_campaigns'  => $this->toolListMetaCampaigns($input),
+                'get_meta_insights'    => $this->toolGetMetaInsights($input),
+                'edit_meta_campaign'   => $this->toolEditMetaCampaign($input),
                 default                => "Unknown tool: {$name}",
             };
         };
@@ -506,5 +509,158 @@ class AdminLaraController extends Controller
 
         $cleanAccount = str_replace('act_', '', $accountId);
         return "Ad created (PAUSED).\nCampaign ID: {$campaignId}\nAd Set ID: {$adSetId}\nAd ID: {$adId}\nReview at: https://www.facebook.com/adsmanager/manage/campaigns?act={$cleanAccount}";
+    }
+
+    private function toolListMetaCampaigns(array $input): string
+    {
+        $token      = env('FACEBOOK_ACCESS_TOKEN');
+        $accountId  = env('FACEBOOK_AD_ACCOUNT_ID');
+        $base       = 'https://graph.facebook.com/v21.0';
+        $preset     = $input['date_preset'] ?? 'last_7_days';
+
+        $res = Http::timeout(20)->get("{$base}/{$accountId}/campaigns", [
+            'fields'      => 'id,name,status,effective_status,daily_budget,insights.date_preset(' . $preset . '){impressions,clicks,spend,reach,ctr,cpm,cpc,frequency}',
+            'limit'       => 25,
+            'access_token' => $token,
+        ]);
+
+        if (!$res->successful()) {
+            return 'Meta API error: ' . substr($res->body(), 0, 400);
+        }
+
+        $campaigns = $res->json('data') ?? [];
+        if (empty($campaigns)) return 'No campaigns found in this ad account.';
+
+        $lines = collect($campaigns)->map(function ($c) {
+            $ins   = $c['insights']['data'][0] ?? null;
+            $spend = $ins ? 'R$' . number_format((float)$ins['spend'], 2) : 'R$0';
+            $impr  = $ins ? number_format((int)$ins['impressions']) : '0';
+            $clicks= $ins ? $ins['clicks'] : '0';
+            $ctr   = $ins ? round((float)$ins['ctr'] * 100, 2) . '%' : '—';
+            $cpm   = $ins ? 'R$' . number_format((float)$ins['cpm'], 2) : '—';
+            $cpc   = $ins ? 'R$' . number_format((float)($ins['cpc'] ?? 0), 2) : '—';
+            $freq  = $ins ? round((float)($ins['frequency'] ?? 0), 1) : '—';
+            $budget= isset($c['daily_budget']) ? 'R$' . number_format($c['daily_budget'] / 100, 0) . '/day' : '—';
+
+            return implode(' | ', [
+                "ID:{$c['id']}",
+                $c['name'],
+                $c['effective_status'],
+                $budget,
+                "spend:{$spend}",
+                "impr:{$impr}",
+                "clicks:{$clicks}",
+                "CTR:{$ctr}",
+                "CPM:{$cpm}",
+                "CPC:{$cpc}",
+                "freq:{$freq}",
+            ]);
+        })->join("\n");
+
+        return "Meta campaigns — {$preset} ({$res->json('data') ? count($campaigns) : 0} found):\n\n{$lines}";
+    }
+
+    private function toolGetMetaInsights(array $input): string
+    {
+        $token     = env('FACEBOOK_ACCESS_TOKEN');
+        $accountId = env('FACEBOOK_AD_ACCOUNT_ID');
+        $base      = 'https://graph.facebook.com/v21.0';
+        $preset    = $input['date_preset'] ?? 'last_30_days';
+        $level     = $input['level'] ?? 'campaign';
+        $entityId  = $input['entity_id'] ?? $accountId;
+        $breakdown = $input['breakdown'] ?? null;
+
+        $params = [
+            'fields'      => 'campaign_name,adset_name,impressions,clicks,spend,reach,ctr,cpm,cpc,frequency,actions',
+            'date_preset' => $preset,
+            'level'       => $level,
+            'access_token' => $token,
+        ];
+
+        if ($breakdown && in_array($breakdown, ['age', 'gender', 'country', 'age,gender'])) {
+            $params['breakdowns'] = $breakdown;
+        }
+
+        $res = Http::timeout(30)->get("{$base}/{$entityId}/insights", $params);
+
+        if (!$res->successful()) {
+            return 'Meta Insights API error: ' . substr($res->body(), 0, 400);
+        }
+
+        $rows = $res->json('data') ?? [];
+        if (empty($rows)) return "No insight data for {$preset} at {$level} level.";
+
+        $lines = collect($rows)->map(function ($r) use ($level, $breakdown) {
+            $label = match($level) {
+                'campaign' => $r['campaign_name'] ?? '?',
+                'adset'    => ($r['adset_name'] ?? '?'),
+                default    => 'Account',
+            };
+            if ($breakdown) {
+                $label .= ' [' . implode('/', array_filter([$r['age'] ?? null, $r['gender'] ?? null, $r['country'] ?? null])) . ']';
+            }
+
+            $spend  = 'R$' . number_format((float)($r['spend'] ?? 0), 2);
+            $impr   = number_format((int)($r['impressions'] ?? 0));
+            $clicks = $r['clicks'] ?? 0;
+            $ctr    = round((float)($r['ctr'] ?? 0) * 100, 2) . '%';
+            $cpm    = 'R$' . number_format((float)($r['cpm'] ?? 0), 2);
+            $cpc    = 'R$' . number_format((float)($r['cpc'] ?? 0), 2);
+            $freq   = round((float)($r['frequency'] ?? 0), 1);
+
+            // Extract link clicks from actions
+            $linkClicks = collect($r['actions'] ?? [])->firstWhere('action_type', 'link_click');
+            $lcCount    = $linkClicks ? $linkClicks['value'] : '—';
+
+            return "{$label}\n  spend:{$spend} | impr:{$impr} | clicks:{$clicks} | link_clicks:{$lcCount} | CTR:{$ctr} | CPM:{$cpm} | CPC:{$cpc} | freq:{$freq}";
+        })->join("\n\n");
+
+        return "Meta Insights — {$level} level — {$preset}" . ($breakdown ? " — by {$breakdown}" : '') . ":\n\n{$lines}";
+    }
+
+    private function toolEditMetaCampaign(array $input): string
+    {
+        $token    = env('FACEBOOK_ACCESS_TOKEN');
+        $base     = 'https://graph.facebook.com/v21.0';
+        $id       = $input['entity_id'] ?? null;
+        $type     = $input['entity_type'] ?? 'campaign'; // campaign | adset
+
+        if (!$id) return 'Error: entity_id is required.';
+
+        $payload = ['access_token' => $token];
+        $changes = [];
+
+        if (!empty($input['status']) && in_array($input['status'], ['ACTIVE', 'PAUSED'])) {
+            $payload['status'] = $input['status'];
+            $changes[] = 'status → ' . $input['status'];
+        }
+
+        if (!empty($input['daily_budget_brl'])) {
+            $payload['daily_budget'] = (int) round($input['daily_budget_brl'] * 100);
+            $changes[] = 'daily_budget → R$' . $input['daily_budget_brl'];
+        }
+
+        if ($type === 'adset' && isset($input['enable_advantage_plus'])) {
+            // Need to fetch current targeting first, then patch advantage_audience
+            $current = Http::timeout(15)->get("{$base}/{$id}", [
+                'fields'       => 'targeting',
+                'access_token' => $token,
+            ]);
+            $targeting = $current->json('targeting') ?? [];
+            $targeting['targeting_automation'] = ['advantage_audience' => $input['enable_advantage_plus'] ? 1 : 0];
+            $payload['targeting'] = json_encode($targeting);
+            $changes[] = 'advantage_audience → ' . ($input['enable_advantage_plus'] ? 'ON' : 'OFF');
+        }
+
+        if (count($payload) === 1) return 'Error: no changes specified (status, daily_budget_brl, or enable_advantage_plus required).';
+
+        $res = Http::timeout(15)->asForm()->post("{$base}/{$id}", $payload);
+
+        if (!$res->successful() || !$res->json('success')) {
+            Log::error('admin_lara: edit_meta_campaign failed', ['id' => $id, 'body' => substr($res->body(), 0, 400)]);
+            return 'Meta API error: ' . substr($res->body(), 0, 300);
+        }
+
+        return ucfirst($type) . " {$id} updated: " . implode(', ', $changes) . '.';
     }
 }

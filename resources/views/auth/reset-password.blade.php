@@ -17,8 +17,11 @@
   input:focus { border-color: #FF2924; }
   .field { margin-bottom: 18px; }
   .error { font-size: 12px; color: #FF2924; margin-top: 5px; }
-  .btn { width: 100%; padding: 12px; background: #111; color: #fff; border: none; border-radius: 8px; font-size: 15px; font-weight: 600; cursor: pointer; margin-top: 4px; transition: background .15s; }
+  .btn { width: 100%; padding: 12px; background: #111; color: #fff; border: none; border-radius: 8px; font-size: 15px; font-weight: 600; cursor: pointer; margin-top: 4px; transition: background .15s, color .15s; position: relative; overflow: hidden; }
   .btn:hover { background: #222; }
+  .btn.loading { pointer-events: none; color: transparent !important; }
+  .btn.loading::after { content: ''; position: absolute; width: 18px; height: 18px; top: 50%; left: 50%; margin: -9px 0 0 -9px; border: 2px solid rgba(255,255,255,.3); border-top-color: #fff; border-radius: 50%; animation: btn-spin .65s linear infinite; }
+  @keyframes btn-spin { to { transform: rotate(360deg); } }
 </style>
 </head>
 <body>
@@ -47,5 +50,11 @@
     <button type="submit" class="btn">Salvar nova senha</button>
   </form>
 </div>
+<script>
+document.querySelector('form').addEventListener('submit', function() {
+  var btn = this.querySelector('button[type=submit]');
+  btn.classList.add('loading');
+});
+</script>
 </body>
 </html>
