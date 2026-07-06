@@ -63,4 +63,9 @@ return [
         'token' => env('APIFY_TOKEN'),
     ],
 
+    'sqs' => [
+        'expire_queue_url' => env('SQS_EXPIRE_QUEUE_URL'),
+        'internal_secret'  => env('INTERNAL_SECRET'),
+    ],
+
 ];

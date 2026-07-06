@@ -7,6 +7,7 @@ use App\Models\Booking;
 use App\Models\Schedule;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Str;
 use Stripe\Stripe;
 use Stripe\PaymentIntent;
@@ -28,10 +29,10 @@ class BookingController extends Controller
             $booking = DB::transaction(function () use ($data) {
                 $schedule = Schedule::lockForUpdate()->findOrFail($data['schedule_id']);
 
-                // Clean up orphaned pending bookings (Stripe failed before payment_ref was set)
+                // Clean up orphaned/expired pending bookings
                 $orphaned = Booking::where('schedule_id', $schedule->id)
                     ->where('status', 'pending')
-                    ->whereNull('payment_ref')
+                    ->where(fn($q) => $q->whereNull('payment_ref')->orWhere('expires_at', '<', now()))
                     ->get();
                 foreach ($orphaned as $o) {
                     $schedule->decrement('seats_booked', $o->seats);
@@ -57,6 +58,7 @@ class BookingController extends Controller
                     'guest_whatsapp'  => isset($data['guest_whatsapp']) ? preg_replace('/\D/', '', $data['guest_whatsapp']) : null,
                     'reference'   => 'ENV-' . strtoupper(Str::random(6)),
                     'status'      => 'pending',
+                    'expires_at'  => now()->addMinutes(15),
                 ]);
 
                 $schedule->increment('seats_booked', $data['seats']);
@@ -85,6 +87,20 @@ class BookingController extends Controller
             ]);
 
             $booking->update(['payment_ref' => $pi->id]);
+
+            // Push expiry job to SQS with 15-min delay
+            $queueUrl = config('services.sqs.expire_queue_url');
+            if ($queueUrl) {
+                $sqsClient = new \Aws\Sqs\SqsClient([
+                    'region'  => 'sa-east-1',
+                    'version' => 'latest',
+                ]);
+                $sqsClient->sendMessage([
+                    'QueueUrl'     => $queueUrl,
+                    'MessageBody'  => json_encode(['booking_id' => $booking->id]),
+                    'DelaySeconds' => 900,
+                ]);
+            }
 
             return response()->json([
                 'data' => [
