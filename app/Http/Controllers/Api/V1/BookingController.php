@@ -91,15 +91,19 @@ class BookingController extends Controller
             // Push expiry job to SQS with 15-min delay
             $queueUrl = config('services.sqs.expire_queue_url');
             if ($queueUrl) {
-                $sqsClient = new \Aws\Sqs\SqsClient([
-                    'region'  => 'sa-east-1',
-                    'version' => 'latest',
-                ]);
-                $sqsClient->sendMessage([
-                    'QueueUrl'     => $queueUrl,
-                    'MessageBody'  => json_encode(['booking_id' => $booking->id]),
-                    'DelaySeconds' => 900,
-                ]);
+                try {
+                    $sqsClient = new \Aws\Sqs\SqsClient([
+                        'region'  => 'sa-east-1',
+                        'version' => 'latest',
+                    ]);
+                    $sqsClient->sendMessage([
+                        'QueueUrl'     => $queueUrl,
+                        'MessageBody'  => json_encode(['booking_id' => $booking->id]),
+                        'DelaySeconds' => 900,
+                    ]);
+                } catch (\Throwable $e) {
+                    \Log::warning('booking: SQS dispatch failed', ['booking_id' => $booking->id, 'error' => $e->getMessage()]);
+                }
             }
 
             return response()->json([
@@ -119,6 +123,7 @@ class BookingController extends Controller
                         'pricing_type' => $activity->pricing_type,
                         'pricing_unit' => $activity->pricing_unit,
                     ],
+                    'expires_at' => $booking->expires_at?->toISOString(),
                     'date' => $booking->schedule->date->toDateString(),
                     'time' => substr($booking->schedule->time, 0, 5),
                 ],
