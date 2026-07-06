@@ -510,6 +510,18 @@ function clearFile() {
     updateSendBtn();
 }
 
+// ── Conversion tracking ───────────────────────────────────
+let _leadFired = false;
+function fireLeadConversion() {
+    if (_leadFired || typeof gtag === 'undefined') return;
+    _leadFired = true;
+    try { gtag('event', 'conversion', {'send_to': 'AW-18282842253/p3rbCPeP48scEI2R-I1E', 'value': 1.0, 'currency': 'EUR'}); } catch {}
+}
+function firePublishedConversion() {
+    if (typeof gtag === 'undefined') return;
+    try { gtag('event', 'conversion', {'send_to': 'AW-18282842253/GdOGCJn348scEI2R-I1E', 'value': 1.0, 'currency': 'EUR'}); } catch {}
+}
+
 // ── Send ──────────────────────────────────────────────────
 async function send() {
     const text = inputEl.value.trim();
@@ -525,6 +537,7 @@ async function send() {
 
     filesToSend.forEach(f => appendFileBubble(f));
     if (textToSend) appendBubble('user', textToSend);
+    fireLeadConversion();
 
     showTyping();
 
@@ -544,6 +557,7 @@ async function send() {
 
         removeTyping();
         if (data.reply) appendBubble('lara', data.reply);
+        if (data.published) firePublishedConversion();
     } catch {
         removeTyping();
         appendBubble('lara', 'Algo deu errado. Tente novamente.');

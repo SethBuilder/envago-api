@@ -171,11 +171,13 @@ class ParceirosController extends Controller
             unset($tour);
         }
 
+        $published = false;
         if ($onboardData) {
             try {
                 $pageUrl    = $onboarding->onboard($onboardData, $sessionId);
                 $email      = $onboardData['operator']['email'] ?? '';
                 $cleanReply = "Página criada. Você pode visualizá-la em:\n{$pageUrl}\n\nEnviamos um e-mail para {$email} com o link para ativar sua conta e acessar o painel. Qualquer dúvida, estou aqui.";
+                $published  = true;
             } catch (\Throwable $e) {
                 Log::error('parceiros.onboard failed', ['error' => $e->getMessage()]);
                 $cleanReply = 'Ocorreu um erro ao criar sua página. Nossa equipe foi notificada — tente novamente em alguns minutos.';
@@ -235,7 +237,7 @@ class ParceirosController extends Controller
         ];
         DB::table('lara_conversations')->insert($rows);
 
-        return response()->json(['reply' => $cleanReply]);
+        return response()->json(['reply' => $cleanReply, 'published' => $published ?? false]);
     }
 
     private function blockIp(string $ip, string $reason): void
