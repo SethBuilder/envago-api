@@ -4,7 +4,8 @@
 
 @push('styles')
 <style>
-  .content { padding: 0 !important; overflow: hidden; }
+  html, body, .main { overflow: hidden !important; height: 100vh !important; }
+  .content { padding: 0 !important; }
 
   .lara-admin-wrap {
     display: flex;
