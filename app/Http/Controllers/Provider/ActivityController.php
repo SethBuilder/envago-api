@@ -8,6 +8,8 @@ use App\Models\Category;
 use App\Services\ActivityService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 
 class ActivityController extends Controller
@@ -27,6 +29,7 @@ class ActivityController extends Controller
             'name'              => 'required|string|max:120',
             'category_id'       => 'nullable|exists:categories,id',
             'description'       => 'nullable|string|max:2000',
+            'highlights'        => 'nullable|string',
             'price'             => 'required|numeric|min:1|max:99999',
             'duration_minutes'  => 'required|integer|min:15|max:1440',
             'capacity'          => 'required|integer|min:1|max:999',
@@ -69,8 +72,11 @@ class ActivityController extends Controller
         $provider = auth()->user()->provider;
         $photos   = $request->hasFile('photos') ? $request->file('photos') : [];
 
+        $data             = $request->all();
+        $data['highlights'] = $this->decodeHighlights($request->input('highlights'));
+
         try {
-            $activity = $this->activityService->createActivity($provider, $request->all(), $photos);
+            $activity = $this->activityService->createActivity($provider, $data, $photos);
         } catch (\Throwable $e) {
             \Illuminate\Support\Facades\Log::error('activity.create failed', ['error' => $e->getMessage()]);
             return response()->json(['errors' => ['photos' => ['Erro ao salvar fotos. Tente novamente.']]], 422);
@@ -116,6 +122,7 @@ class ActivityController extends Controller
             'name'              => 'required|string|max:120',
             'category_id'       => 'nullable|exists:categories,id',
             'description'       => 'nullable|string|max:2000',
+            'highlights'        => 'nullable|string',
             'price'             => 'required|numeric|min:1|max:99999',
             'duration_minutes'  => 'required|integer|min:15|max:1440',
             'capacity'          => 'required|integer|min:1|max:999',
@@ -158,6 +165,8 @@ class ActivityController extends Controller
         $newPhotos      = $request->hasFile('photos') ? $request->file('photos') : [];
         $deleteMediaIds = $request->input('delete_media', []);
         $newVideos      = $request->hasFile('videos') ? $request->file('videos') : [];
+        $updateData     = $request->all();
+        $updateData['highlights'] = $this->decodeHighlights($request->input('highlights'));
 
         $igUrls = array_filter((array) $request->input('instagram_urls', []));
         if (!empty($igUrls)) {
@@ -182,7 +191,7 @@ class ActivityController extends Controller
         }
 
         try {
-            $this->activityService->updateActivity($activity, $request->all(), $newPhotos, $deleteMediaIds, $newVideos);
+            $this->activityService->updateActivity($activity, $updateData, $newPhotos, $deleteMediaIds, $newVideos);
         } catch (\Throwable $e) {
             \Illuminate\Support\Facades\Log::error('activity.update failed', ['error' => $e->getMessage()]);
             return response()->json(['errors' => ['photos' => ['Erro ao salvar mídia. Tente novamente.']]], 422);
@@ -192,5 +201,75 @@ class ActivityController extends Controller
             'redirect' => route('provider.activities'),
             'message'  => 'Passeio atualizado com sucesso.',
         ]);
+    }
+
+    public function aiEnhanceDescription(Request $request)
+    {
+        $description = trim($request->input('description', ''));
+        if (empty($description)) {
+            return response()->json(['error' => 'Descrição vazia.'], 422);
+        }
+
+        $res = Http::timeout(60)->withHeaders([
+            'x-api-key'         => env('ANTHROPIC_API_KEY'),
+            'anthropic-version' => '2023-06-01',
+            'content-type'      => 'application/json',
+        ])->post('https://api.anthropic.com/v1/messages', [
+            'model'      => 'claude-haiku-4-5-20251001',
+            'max_tokens' => 600,
+            'messages'   => [[
+                'role'    => 'user',
+                'content' => "Você é um redator especializado em turismo no Brasil. Reescreva esta descrição de passeio em Markdown estruturado para ser mais atraente e profissional para turistas.\n\nRegras de formatação:\n- Use ## para seções (ex: ## O que está incluído, ## O que esperar, ## Informações importantes)\n- Use **negrito** para destacar pontos-chave\n- Use listas com - para itens incluídos/excluídos\n- Parágrafo de abertura convidativo sem título\n- PT-BR, tom amigável e convidativo\n- Máx 400 palavras\n- Retorne apenas o Markdown, sem comentários ou aspas\n\nDescrição original:\n{$description}",
+            ]],
+        ]);
+
+        if (!$res->ok()) {
+            Log::error('ai.enhance-description failed', ['status' => $res->status()]);
+            return response()->json(['error' => 'Erro ao chamar IA. Tente novamente.'], 500);
+        }
+
+        return response()->json(['description' => trim($res->json('content.0.text') ?? '')]);
+    }
+
+    public function aiExtractHighlights(Request $request)
+    {
+        $description = trim($request->input('description', ''));
+        if (empty($description)) {
+            return response()->json(['error' => 'Descrição vazia.'], 422);
+        }
+
+        $res = Http::timeout(60)->withHeaders([
+            'x-api-key'         => env('ANTHROPIC_API_KEY'),
+            'anthropic-version' => '2023-06-01',
+            'content-type'      => 'application/json',
+        ])->post('https://api.anthropic.com/v1/messages', [
+            'model'      => 'claude-haiku-4-5-20251001',
+            'max_tokens' => 300,
+            'messages'   => [[
+                'role'    => 'user',
+                'content' => "Extraia até 6 destaques desta descrição de passeio. Retorne APENAS um JSON array de strings, sem markdown, sem explicação. PT-BR, máx 60 chars por item. Exemplo: [\"Vista panorâmica das dunas\",\"Guia local experiente\"]\n\nDescrição:\n{$description}",
+            ]],
+        ]);
+
+        if (!$res->ok()) {
+            Log::error('ai.extract-highlights failed', ['status' => $res->status()]);
+            return response()->json(['error' => 'Erro ao chamar IA. Tente novamente.'], 500);
+        }
+
+        $text = trim($res->json('content.0.text') ?? '');
+        $json = json_decode($text, true);
+        if (!is_array($json)) {
+            preg_match('/\[.*\]/s', $text, $m);
+            $json = isset($m[0]) ? json_decode($m[0], true) : [];
+        }
+
+        return response()->json(['highlights' => $json ?? []]);
+    }
+
+    private function decodeHighlights(?string $raw): ?array
+    {
+        if (empty($raw)) return null;
+        $decoded = json_decode($raw, true);
+        return is_array($decoded) ? array_values(array_filter($decoded)) : null;
     }
 }

@@ -87,6 +87,7 @@ class ActivityController extends Controller
                 'name'             => $activity->name,
                 'slug'             => $activity->slug,
                 'description'      => $activity->description,
+                'highlights'       => $activity->highlights ?? [],
                 'price'            => $activity->price,
                 'pricing_type'     => $activity->pricing_type,
                 'pricing_unit'     => $activity->pricing_unit,

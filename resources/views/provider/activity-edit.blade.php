@@ -210,10 +210,31 @@
       </div>
 
       <div class="f-group">
-        <label class="f-label">Descrição</label>
-        <textarea name="description" rows="3" class="f-input"
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:5px;">
+          <label class="f-label" style="margin:0;">Descrição</label>
+          <button type="button" id="btn-enhance-desc" onclick="aiEnhanceDescription()"
+            style="font-size:11px;padding:4px 10px;border-radius:6px;border:1px solid #e0e0e0;background:#fafafa;color:#666;cursor:pointer;display:flex;align-items:center;gap:4px;line-height:1;">
+            ✨ Melhorar com IA
+          </button>
+        </div>
+        <textarea name="description" rows="4" class="f-input"
           style="resize:vertical;line-height:1.5;" maxlength="2000" id="f-description">{{ $activity->description }}</textarea>
         <span class="f-error" id="err-description"></span>
+      </div>
+
+      <div class="f-group">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:5px;">
+          <label class="f-label" style="margin:0;">Destaques</label>
+          <button type="button" id="btn-extract-hl" onclick="aiExtractHighlights()"
+            style="font-size:11px;padding:4px 10px;border-radius:6px;border:1px solid #e0e0e0;background:#fafafa;color:#666;cursor:pointer;display:flex;align-items:center;gap:4px;line-height:1;">
+            ✨ Extrair com IA
+          </button>
+        </div>
+        <textarea id="f-highlights-raw" rows="4" class="f-input"
+          placeholder="Um destaque por linha&#10;ex: Pôr do sol nas dunas&#10;Guia local experiente&#10;Inclui água e protetor solar"
+          style="resize:vertical;line-height:1.6;">{{ $activity->highlights ? implode("\n", $activity->highlights) : '' }}</textarea>
+        <input type="hidden" name="highlights" id="f-highlights">
+        <span class="f-hint">Um destaque por linha. Aparece como lista na página do passeio.</span>
       </div>
 
       <div class="f-group">
@@ -555,6 +576,46 @@ function removeTime(id, ts) {
   document.getElementById(`tc-${id}-${ts}`)?.remove();
 }
 
+// ── AI helpers ────────────────────────────────────────────────
+async function aiEnhanceDescription() {
+  const ta = document.getElementById('f-description');
+  const btn = document.getElementById('btn-enhance-desc');
+  const desc = ta.value.trim();
+  if (!desc) { alert('Adicione uma descrição primeiro.'); return; }
+  btn.disabled = true; btn.textContent = 'Melhorando...';
+  try {
+    const res = await fetch('{{ route('provider.activities.ai.enhance') }}', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': document.querySelector('[name=_token]').value },
+      body: JSON.stringify({ description: desc }),
+    });
+    const data = await res.json();
+    if (data.description) ta.value = data.description;
+    else alert(data.error || 'Erro ao melhorar descrição.');
+  } catch { alert('Erro de conexão.'); }
+  btn.disabled = false; btn.innerHTML = '✨ Melhorar com IA';
+}
+
+async function aiExtractHighlights() {
+  const ta = document.getElementById('f-description');
+  const raw = document.getElementById('f-highlights-raw');
+  const btn = document.getElementById('btn-extract-hl');
+  const desc = ta.value.trim();
+  if (!desc) { alert('Adicione uma descrição primeiro.'); return; }
+  btn.disabled = true; btn.textContent = 'Extraindo...';
+  try {
+    const res = await fetch('{{ route('provider.activities.ai.highlights') }}', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': document.querySelector('[name=_token]').value },
+      body: JSON.stringify({ description: desc }),
+    });
+    const data = await res.json();
+    if (data.highlights) raw.value = data.highlights.join('\n');
+    else alert(data.error || 'Erro ao extrair destaques.');
+  } catch { alert('Erro de conexão.'); }
+  btn.disabled = false; btn.innerHTML = '✨ Extrair com IA';
+}
+
 // ── AJAX Submit ───────────────────────────────────────────────
 document.getElementById('edit-form').addEventListener('submit', async function(e) {
   e.preventDefault();
@@ -563,6 +624,10 @@ document.getElementById('edit-form').addEventListener('submit', async function(e
   const btn = document.getElementById('submit-btn');
   btn.disabled = true;
   btn.innerHTML = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="animation:spin .8s linear infinite"><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/></svg> Salvando...`;
+
+  const hlRaw = document.getElementById('f-highlights-raw').value;
+  const hlItems = hlRaw.split('\n').map(s => s.trim()).filter(Boolean);
+  document.getElementById('f-highlights').value = JSON.stringify(hlItems);
 
   const formData = new FormData(this);
   formData.delete('photos[]');
