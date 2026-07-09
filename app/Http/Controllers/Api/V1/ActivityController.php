@@ -39,6 +39,8 @@ class ActivityController extends Controller
                 'cover_url'        => $a->cover?->url,
                 'first_video'      => !$a->cover && $a->firstVideo ? ['url' => $a->firstVideo->url, 'poster_url' => $a->firstVideo->poster_url] : null,
                 'provider'         => $a->provider ? ['id' => $a->provider->id, 'business_name' => $a->provider->business_name, 'slug' => $a->provider->slug, 'logo_url' => $a->provider->logo_url] : null,
+                'booking_method'   => $a->booking_method ?? 'envago',
+                'link_url'         => $a->link_url,
                 'avg_rating'       => $a->reviews->avg('rating') ? round($a->reviews->avg('rating'), 1) : null,
                 'review_count'     => $a->reviews->count(),
                 'recent_reviews'   => $a->reviews->take(4)->map(fn($r) => [
@@ -108,6 +110,8 @@ class ActivityController extends Controller
                     'poster_url'       => $m->poster_url,
                     'instagram_handle' => $m->instagram_handle,
                 ])->values(),
+                'booking_method'   => $activity->booking_method ?? 'envago',
+                'link_url'         => $activity->link_url,
                 'meeting_point'    => $activity->meeting_point,
                 'meeting_point_lat'=> $activity->meeting_point_lat,
                 'meeting_point_lng'=> $activity->meeting_point_lng,

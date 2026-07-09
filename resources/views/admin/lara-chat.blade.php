@@ -159,6 +159,9 @@
       <div class="lara-admin-bar-dot"></div>
       Lara · Admin
     </div>
+    <button id="lara-reset" onclick="resetChat()" style="font-size:12px;color:#999;background:none;border:1px solid #e5e5e5;border-radius:8px;padding:5px 12px;cursor:pointer;transition:all .15s;" onmouseover="this.style.color='#111';this.style.borderColor='#999'" onmouseout="this.style.color='#999';this.style.borderColor='#e5e5e5'">
+      Reset
+    </button>
   </div>
 
   <div class="lara-admin-messages" id="messages">
@@ -288,6 +291,19 @@
     msgs.scrollTop = msgs.scrollHeight;
     return row;
   }
+
+  window.resetChat = function () {
+    if (!confirm('Clear conversation history?')) return;
+    fetch('{{ route('admin.lara.reset') }}', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-CSRF-TOKEN': document.querySelector('meta[name=csrf-token]').content,
+      },
+    }).then(function () {
+      window.location.reload();
+    });
+  };
 
   // Auto-resize textarea
   document.getElementById('lara-input').addEventListener('input', function () {

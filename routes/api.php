@@ -3,8 +3,11 @@
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Api\V1\ActivityController;
+use App\Http\Controllers\Api\V1\ArticleController;
+use App\Http\Controllers\Api\V1\StoryController;
 use App\Http\Controllers\Api\V1\BookingController;
 use App\Http\Controllers\Api\V1\CategoryController;
+use App\Http\Controllers\Api\V1\ClickController;
 use App\Http\Controllers\Api\V1\LaraChatController;
 use App\Http\Controllers\Api\V1\ProviderController;
 use App\Http\Controllers\Api\V1\StripeWebhookController;
@@ -16,6 +19,12 @@ Route::prefix('v1')->group(function () {
     Route::get('activities', [ActivityController::class, 'index']);
     Route::get('activities/{slug}', [ActivityController::class, 'show']);
     Route::get('operadores/{slug}', [ProviderController::class, 'show']);
+    Route::get('articles', [ArticleController::class, 'index']);
+    Route::get('articles/{slug}', [ArticleController::class, 'show']);
+    Route::get('articles/{slug}/story', [ArticleController::class, 'story']);
+    Route::get('stories',              [StoryController::class, 'index']);
+    Route::get('stories/{slug}',       [StoryController::class, 'show']);
+    Route::post('clicks', [ClickController::class, 'store'])->middleware('throttle:10,1');
     Route::post('bookings', [BookingController::class, 'store'])->middleware('throttle:3,15');
     Route::get('bookings/{reference}/status', [BookingController::class, 'status']);
 });

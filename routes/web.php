@@ -10,6 +10,8 @@ use App\Http\Controllers\Admin\LaraInstructionsController;
 use App\Http\Controllers\Admin\PayoutController as AdminPayout;
 use App\Http\Controllers\Admin\ProviderController as AdminProvider;
 use App\Http\Controllers\Admin\ScopeLeadsController;
+use App\Http\Controllers\Admin\AdminArticleController;
+use App\Http\Controllers\Admin\AdminWebStoryController;
 use App\Http\Controllers\Provider\DashboardController as ProviderDashboard;
 use App\Http\Controllers\Provider\SettingsController as ProviderSettings;
 use App\Http\Controllers\Provider\ActivityController as ProviderActivity;
@@ -60,6 +62,19 @@ Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(fun
     Route::get('/lara/conversations',                      [LaraConversationsController::class, 'index'])->name('lara.conversations');
     Route::get('/lara/conversations/{sessionId}',          [LaraConversationsController::class, 'show'])->name('lara.conversations.show');
     Route::get('/scope-leads',                             [ScopeLeadsController::class,        'index'])->name('scope-leads');
+    Route::get('/articles',                                [AdminArticleController::class,      'index'])->name('articles');
+    Route::get('/articles/{article}/edit',                 [AdminArticleController::class,      'edit'])->name('articles.edit');
+    Route::post('/articles/{article}/update',              [AdminArticleController::class,      'update'])->name('articles.update');
+    Route::post('/articles/{article}/publish',             [AdminArticleController::class,      'publish'])->name('articles.publish');
+    Route::post('/articles/{article}/unpublish',           [AdminArticleController::class,      'unpublish'])->name('articles.unpublish');
+    Route::delete('/articles/{article}',                   [AdminArticleController::class,      'destroy'])->name('articles.destroy');
+    Route::post('/articles/{id}/restore',                  [AdminArticleController::class,      'restore'])->name('articles.restore');
+    Route::get('/stories',                                [AdminWebStoryController::class, 'index'])->name('stories');
+    Route::get('/stories/{story}/edit',                   [AdminWebStoryController::class, 'edit'])->name('stories.edit');
+    Route::post('/stories/{story}/update',                [AdminWebStoryController::class, 'update'])->name('stories.update');
+    Route::post('/stories/{story}/publish',               [AdminWebStoryController::class, 'publish'])->name('stories.publish');
+    Route::post('/stories/{story}/unpublish',             [AdminWebStoryController::class, 'unpublish'])->name('stories.unpublish');
+
     Route::get('/lara-instructions',                       [LaraInstructionsController::class,  'index'])->name('lara.instructions');
     Route::post('/lara-instructions',                      [LaraInstructionsController::class,  'store'])->name('lara.instructions.store');
     Route::post('/lara-instructions/{instruction}/toggle', [LaraInstructionsController::class,  'toggle'])->name('lara.instructions.toggle');

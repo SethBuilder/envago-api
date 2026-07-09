@@ -3,7 +3,10 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Models\ResearchData;
+use App\Services\ApifyService;
 use App\Services\LaraService;
+use App\Services\YouTubeService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
@@ -35,7 +38,7 @@ class AdminLaraController extends Controller
         $sessionId   = $this->sessionId();
         $userMessage = $request->input('message');
 
-        set_time_limit(120);
+        set_time_limit(400);
 
         $history = DB::table('lara_conversations')
             ->where('session_id', $sessionId)
@@ -87,7 +90,14 @@ class AdminLaraController extends Controller
                 'list_meta_campaigns'  => $this->toolListMetaCampaigns($input),
                 'get_meta_insights'    => $this->toolGetMetaInsights($input),
                 'edit_meta_campaign'   => $this->toolEditMetaCampaign($input),
-                default                => "Unknown tool: {$name}",
+                'create_article'        => $this->toolCreateArticle($input),
+                'update_article'        => $this->toolUpdateArticle($input),
+                'get_article'           => $this->toolGetArticle($input),
+                'list_articles'         => $this->toolListArticles($input),
+                'research_destination'  => $this->toolResearchDestination($input),
+                'query_leads'           => $this->toolQueryLeads($input),
+                'suggest_articles'      => $this->toolSuggestArticles($input),
+                default                 => "Unknown tool: {$name}",
             };
         };
     }
@@ -663,5 +673,466 @@ class AdminLaraController extends Controller
         }
 
         return ucfirst($type) . " {$id} updated: " . implode(', ', $changes) . '.';
+    }
+
+    private function toolCreateArticle(array $input): string
+    {
+        $required = ['slug', 'title', 'content', 'slides'];
+        foreach ($required as $field) {
+            if (empty($input[$field])) return "Error: {$field} is required.";
+        }
+
+        if (\App\Models\Article::where('slug', $input['slug'])->exists()) {
+            return "Error: article with slug '{$input['slug']}' already exists. Use update_article instead.";
+        }
+
+        $article = \App\Models\Article::create([
+            'slug'             => $input['slug'],
+            'title'            => $input['title'],
+            'meta_title'       => $input['meta_title'] ?? $input['title'],
+            'meta_description' => $input['meta_description'] ?? null,
+            'destination'      => $input['destination'] ?? null,
+            'template_type'    => $input['template_type'] ?? null,
+            'content'          => $input['content'],
+            'cover_image'      => null,
+            'status'           => 'draft',
+        ]);
+
+        $article->story()->create([
+            'slides' => $input['slides'],
+            'status' => 'draft',
+        ]);
+
+        $editUrl = rtrim(env('APP_URL'), '/') . '/admin/articles/' . $article->id . '/edit';
+        return "Draft saved: '{$article->title}' — " . count($input['slides']) . " story slides. Review and publish at {$editUrl}";
+    }
+
+    private function toolUpdateArticle(array $input): string
+    {
+        if (empty($input['slug'])) return 'Error: slug is required.';
+
+        $article = \App\Models\Article::where('slug', $input['slug'])->first();
+        if (!$article) return "Error: article '{$input['slug']}' not found.";
+
+        $fields = ['title', 'meta_title', 'meta_description', 'destination', 'template_type', 'content', 'cover_image'];
+        $updates = array_filter(array_intersect_key($input, array_flip($fields)), fn($v) => $v !== null);
+
+        if ($updates) $article->update($updates);
+
+        if (!empty($input['slides']) && $article->story) {
+            $article->story->update(['slides' => $input['slides']]);
+        }
+
+        $changed = array_keys($updates);
+        if (!empty($input['slides'])) $changed[] = 'slides';
+
+        return "Article '{$article->slug}' updated: " . implode(', ', $changed) . '.';
+    }
+
+    private function toolGetArticle(array $input): string
+    {
+        if (empty($input['slug'])) return 'Error: slug is required.';
+
+        $article = \App\Models\Article::where('slug', $input['slug'])->with('story')->first();
+        if (!$article) return "Error: article '{$input['slug']}' not found.";
+
+        return json_encode([
+            'slug'             => $article->slug,
+            'title'            => $article->title,
+            'status'           => $article->status,
+            'destination'      => $article->destination,
+            'template_type'    => $article->template_type,
+            'meta_description' => $article->meta_description,
+            'cover_image'      => $article->cover_image,
+            'content'          => $article->content,
+            'slides'           => $article->story?->slides ?? [],
+        ]);
+    }
+
+    private function toolListArticles(array $input): string
+    {
+        $articles = \App\Models\Article::orderByDesc('published_at')
+            ->get(['slug', 'title', 'status', 'destination', 'template_type', 'published_at']);
+
+        if ($articles->isEmpty()) return 'No articles yet.';
+
+        return $articles->map(fn($a) =>
+            "[{$a->status}] {$a->slug} — {$a->title}" . ($a->destination ? " ({$a->destination})" : '')
+        )->join("\n");
+    }
+
+    private function toolResearchDestination(array $input): string
+    {
+        $destination = trim($input['destination'] ?? '');
+        if (!$destination) return 'Error: destination is required.';
+
+        $skipDomains = [
+            'booking.com', 'tripadvisor.com', 'airbnb.com', 'youtube.com',
+            'instagram.com', 'facebook.com', 'reddit.com', 'twitter.com',
+            'x.com', 'maps.google.com', 'expedia.com', 'viator.com',
+            'getyourguide.com', 'decolar.com', 'kayak.com',
+        ];
+
+        $summary = "# Research: {$destination}\n\n";
+
+        // --- Surface existing research ---
+        $existing = ResearchData::where('destination', $destination)
+            ->orderByDesc('created_at')
+            ->get();
+
+        if ($existing->isNotEmpty()) {
+            $summary .= "## Previously collected data ({$existing->count()} records)\n";
+            foreach ($existing as $record) {
+                $summary .= "- [{$record->source}] collected " . $record->created_at->diffForHumans() . "\n";
+            }
+            $summary .= "\n";
+        }
+
+        // --- YouTube research ---
+        try {
+            $youtube     = new YouTubeService();
+            $ytData      = $youtube->researchDestination($destination);
+            $videoCount  = count($ytData['videos'] ?? []);
+            $commentCount = collect($ytData['videos'] ?? [])->sum(fn($v) => count($v['top_comments'] ?? []));
+
+            ResearchData::create([
+                'destination' => $destination,
+                'source'      => 'youtube',
+                'raw_data'    => $this->sanitizeUtf8($ytData),
+            ]);
+
+            $summary .= "## YouTube ({$videoCount} videos, {$commentCount} comments)\n";
+            foreach (($ytData['videos'] ?? []) as $i => $v) {
+                $summary .= ($i + 1) . ". \"{$v['title']}\" ({$v['view_count']} views)\n";
+                if ($v['description']) {
+                    $summary .= "   " . substr($v['description'], 0, 200) . "\n";
+                }
+                if (!empty($v['tags'])) {
+                    $summary .= "   Tags: " . implode(', ', array_slice($v['tags'], 0, 8)) . "\n";
+                }
+                foreach (array_slice($v['top_comments'] ?? [], 0, 3) as $c) {
+                    $summary .= "   💬 " . substr($c['text'], 0, 150) . "\n";
+                }
+                $summary .= "\n";
+            }
+        } catch (\Throwable $e) {
+            Log::error('research_destination: youtube failed', ['destination' => $destination, 'error' => $e->getMessage()]);
+            $summary .= "## YouTube\nFailed: {$e->getMessage()}\n\n";
+        }
+
+        // --- YouTube Transcripts (progressive — fetch top 3 uncached, surface all cached) ---
+        try {
+            $allVideoIds = collect($ytData['videos'] ?? [])->pluck('id')->filter()->values()->all();
+
+            $allTranscripts = ResearchData::where('destination', $destination)
+                ->where('source', 'youtube_transcript')
+                ->get();
+
+            $cachedVideoIds = $allTranscripts
+                ->map(fn($t) => $t->raw_data['video_id'] ?? null)
+                ->filter()->values()->all();
+
+            $toFetch = array_slice(array_values(array_diff($allVideoIds, $cachedVideoIds)), 0, 3);
+
+            if (!empty($toFetch)) {
+                $apify = app(ApifyService::class);
+                foreach ($toFetch as $videoId) {
+                    $transcript = $apify->fetchYouTubeTranscript($videoId);
+                    if ($transcript) {
+                        $title = collect($ytData['videos'] ?? [])->firstWhere('id', $videoId)['title'] ?? $videoId;
+                        $record = ResearchData::create([
+                            'destination' => $destination,
+                            'source'      => 'youtube_transcript',
+                            'raw_data'    => $this->sanitizeUtf8(['video_id' => $videoId, 'title' => $title, 'transcript' => $transcript]),
+                        ]);
+                        $allTranscripts->push($record);
+                    }
+                }
+            }
+
+            $matching = $allTranscripts->filter(fn($t) => in_array($t->raw_data['video_id'] ?? '', $allVideoIds));
+            if ($matching->isNotEmpty()) {
+                $summary .= "## YouTube Transcripts (" . $matching->count() . " videos)\n";
+                foreach ($matching as $t) {
+                    $summary .= "### \"{$t->raw_data['title']}\"\n" . substr($t->raw_data['transcript'], 0, 2000) . "\n\n";
+                }
+            }
+        } catch (\Throwable $e) {
+            Log::error('research_destination: transcripts failed', ['destination' => $destination, 'error' => $e->getMessage()]);
+        }
+
+        // --- Apify SERP research ---
+        try {
+            $apifyToken = config('services.apify.token');
+            $serpQuery  = "{$destination} o que fazer passeios";
+
+            $apifyRes = Http::timeout(30)->post(
+                "https://api.apify.com/v2/acts/apify~google-search-scraper/run-sync-get-dataset-items?token={$apifyToken}",
+                [
+                    'queries'        => $serpQuery,
+                    'maxPagesPerQuery' => 1,
+                    'resultsPerPage' => 10,
+                    'languageCode'   => 'pt-BR',
+                    'countryCode'    => 'br',
+                ]
+            );
+
+            if ($apifyRes->ok() || $apifyRes->status() === 201) {
+                $serpItems = $apifyRes->json() ?? [];
+                $serpItem  = $serpItems[0] ?? [];
+
+
+                $organic = collect($serpItem['organicResults'] ?? [])->filter(function ($r) use ($skipDomains) {
+                    $url = strtolower($r['url'] ?? '');
+                    foreach ($skipDomains as $domain) {
+                        if (str_contains($url, $domain)) return false;
+                    }
+                    return true;
+                })->values()->all();
+
+                $paa     = $serpItem['peopleAlsoAsk'] ?? [];
+                $related = $serpItem['relatedQueries'] ?? [];
+
+                ResearchData::create([
+                    'destination' => $destination,
+                    'source'      => 'apify_serp',
+                    'raw_data'    => $this->sanitizeUtf8([
+                        'query'   => $serpQuery,
+                        'organic' => $organic,
+                        'paa'     => $paa,
+                        'related' => $related,
+                    ]),
+                ]);
+
+                $summary .= "## SERP — \"{$serpQuery}\"\n";
+                $summary .= "### Organic results (" . count($organic) . " editorial)\n";
+                foreach ($organic as $i => $r) {
+                    $summary .= ($i + 1) . ". [{$r['title']}]({$r['url']})\n";
+                    if (!empty($r['description'])) {
+                        $summary .= "   " . substr($r['description'], 0, 150) . "\n";
+                    }
+                }
+
+                if (!empty($paa)) {
+                    $summary .= "\n### People Also Ask\n";
+                    foreach (array_slice($paa, 0, 8) as $q) {
+                        $question = $q['question'] ?? ($q['title'] ?? '');
+                        if ($question) $summary .= "- {$question}\n";
+                    }
+                }
+
+                if (!empty($related)) {
+                    $summary .= "\n### Related searches\n";
+                    foreach (array_slice($related, 0, 8) as $r) {
+                        $term = $r['title'] ?? ($r['query'] ?? '');
+                        if ($term) $summary .= "- {$term}\n";
+                    }
+                }
+
+                // Pre-fetch article content (top 3 uncached URLs)
+                $allCachedArticles = ResearchData::where('destination', $destination)
+                    ->where('source', 'serp_article')
+                    ->get();
+
+                $cachedUrls = $allCachedArticles
+                    ->map(fn($a) => $a->raw_data['url'] ?? null)
+                    ->filter()->values()->all();
+
+                $toFetchArticles = collect($organic)
+                    ->filter(fn($r) => !in_array($r['url'] ?? '', $cachedUrls))
+                    ->take(3)
+                    ->values()->all();
+
+                foreach ($toFetchArticles as $r) {
+                    $text = $this->fetchArticleText($r['url'] ?? '');
+                    if ($text) {
+                        $record = ResearchData::create([
+                            'destination' => $destination,
+                            'source'      => 'serp_article',
+                            'raw_data'    => $this->sanitizeUtf8(['url' => $r['url'], 'title' => $r['title'] ?? '', 'content' => $text]),
+                        ]);
+                        $allCachedArticles->push($record);
+                    }
+                }
+
+                $allCachedArticles = $allCachedArticles->take(6);
+                if ($allCachedArticles->isNotEmpty()) {
+                    $summary .= "\n### Competitor article content (" . $allCachedArticles->count() . " articles)\n";
+                    foreach ($allCachedArticles as $a) {
+                        $summary .= "#### [{$a->raw_data['title']}]({$a->raw_data['url']})\n" . substr($a->raw_data['content'] ?? '', 0, 2000) . "\n\n";
+                    }
+                }
+            } else {
+                Log::error('research_destination: apify serp 400', [
+                    'status' => $apifyRes->status(),
+                    'body'   => substr($apifyRes->body(), 0, 500),
+                ]);
+                $summary .= "## SERP\nApify returned status {$apifyRes->status()}.\n\n";
+            }
+        } catch (\Throwable $e) {
+            Log::error('research_destination: apify serp failed', ['destination' => $destination, 'error' => $e->getMessage()]);
+            $summary .= "## SERP\nFailed: {$e->getMessage()}\n\n";
+        }
+
+        return $summary;
+    }
+
+    private function toolQueryLeads(array $input): string
+    {
+        $destination = $input['destination'] ?? null;
+        $type        = $input['type'] ?? null; // affiliate | lead | all
+        $limit       = $input['limit'] ?? 50;
+
+        $query = DB::table('outbound_clicks')
+            ->join('activities', 'activities.id', '=', 'outbound_clicks.activity_id')
+            ->select(
+                'outbound_clicks.type',
+                'outbound_clicks.destination',
+                'outbound_clicks.category',
+                'activities.name as activity_name',
+                DB::raw('COUNT(*) as click_count'),
+                DB::raw('MAX(outbound_clicks.created_at) as last_click')
+            )
+            ->groupBy('outbound_clicks.activity_id', 'outbound_clicks.type', 'outbound_clicks.destination', 'outbound_clicks.category', 'activities.name');
+
+        if ($destination) {
+            $query->where('outbound_clicks.destination', 'like', '%' . $destination . '%');
+        }
+        if ($type && in_array($type, ['affiliate', 'lead'])) {
+            $query->where('outbound_clicks.type', $type);
+        }
+
+        $rows = $query->orderByDesc('click_count')->limit($limit)->get();
+
+        if ($rows->isEmpty()) return 'No outbound clicks recorded yet.';
+
+        $total = $rows->sum('click_count');
+        $lines = $rows->map(fn($r) =>
+            "[{$r->type}] {$r->activity_name} | {$r->destination} | {$r->category} | {$r->click_count} clicks | last: " . date('Y-m-d', strtotime($r->last_click))
+        )->join("\n");
+
+        return "Outbound clicks ({$total} total):\n\n{$lines}";
+    }
+
+    private function toolSuggestArticles(array $input): string
+    {
+        $destination = trim($input['destination'] ?? '');
+        if (!$destination) return 'Error: destination is required.';
+
+        $apifyToken = config('services.apify.token');
+        $summary    = "# Article Ideas for {$destination}\n\n";
+
+        // 1. Activities on Envago
+        $activities = DB::table('activities')
+            ->join('providers', 'providers.id', '=', 'activities.provider_id')
+            ->leftJoin('categories', 'categories.id', '=', 'activities.category_id')
+            ->select('activities.name', 'activities.price', 'categories.slug as category', 'activities.booking_method')
+            ->where('activities.is_active', true)
+            ->where('activities.city', 'like', '%' . $destination . '%')
+            ->get();
+
+        $summary .= "## Envago trips in {$destination} (" . $activities->count() . ")\n";
+        foreach ($activities as $a) {
+            $summary .= "- [{$a->booking_method}] {$a->name} ({$a->category}) R$" . number_format($a->price, 0) . "\n";
+        }
+
+        // 2. Bookings — what converts
+        $bookings = DB::table('bookings')
+            ->join('schedules', 'schedules.id', '=', 'bookings.schedule_id')
+            ->join('activities', 'activities.id', '=', 'schedules.activity_id')
+            ->leftJoin('categories', 'categories.id', '=', 'activities.category_id')
+            ->select('activities.name', 'categories.slug as category', DB::raw('COUNT(*) as booking_count'))
+            ->where('bookings.status', 'confirmed')
+            ->where('activities.city', 'like', '%' . $destination . '%')
+            ->groupBy('activities.id', 'activities.name', 'categories.slug')
+            ->orderByDesc('booking_count')
+            ->get();
+
+        $summary .= "\n## What's booking well\n";
+        $summary .= $bookings->isEmpty() ? "No confirmed bookings yet.\n" :
+            $bookings->map(fn($b) => "- {$b->name} ({$b->category}): {$b->booking_count} bookings")->join("\n") . "\n";
+
+        // 3. Scope leads — supply gaps
+        $scopeLeads = DB::table('scope_leads')
+            ->where('location', 'like', '%' . $destination . '%')
+            ->select('offering', DB::raw('COUNT(*) as count'))
+            ->groupBy('offering')
+            ->orderByDesc('count')
+            ->limit(10)
+            ->get();
+
+        $summary .= "\n## Scope leads (supply not yet on Envago)\n";
+        $summary .= $scopeLeads->isEmpty() ? "None.\n" :
+            $scopeLeads->map(fn($l) => "- {$l->offering}: {$l->count} operators")->join("\n") . "\n";
+
+        // 4. Outbound clicks — tourist demand gaps
+        $clicks = DB::table('outbound_clicks')
+            ->select('category', 'type', DB::raw('COUNT(*) as count'))
+            ->where('destination', 'like', '%' . $destination . '%')
+            ->groupBy('category', 'type')
+            ->orderByDesc('count')
+            ->get();
+
+        $summary .= "\n## Tourist demand signals (outbound clicks)\n";
+        $summary .= $clicks->isEmpty() ? "No clicks recorded yet.\n" :
+            $clicks->map(fn($c) => "- [{$c->type}] {$c->category}: {$c->count} clicks")->join("\n") . "\n";
+
+        // 5. SERP — what ranks + PAA
+        try {
+            $serpQuery = "o que fazer em {$destination}";
+            $apifyRes  = Http::timeout(30)->post(
+                "https://api.apify.com/v2/acts/apify~google-search-scraper/run-sync-get-dataset-items?token={$apifyToken}",
+                ['queries' => $serpQuery, 'maxPagesPerQuery' => 1, 'resultsPerPage' => 5, 'languageCode' => 'pt-BR', 'countryCode' => 'br']
+            );
+
+            if ($apifyRes->ok() || $apifyRes->status() === 201) {
+                $serpItem = ($apifyRes->json() ?? [])[0] ?? [];
+                $paa      = array_slice($serpItem['peopleAlsoAsk'] ?? [], 0, 6);
+                $organic  = array_slice($serpItem['organicResults'] ?? [], 0, 5);
+
+                $summary .= "\n## SERP — \"{$serpQuery}\"\n";
+                $summary .= "Top results: " . collect($organic)->pluck('title')->join(', ') . "\n";
+
+                if (!empty($paa)) {
+                    $summary .= "PAA: " . collect($paa)->map(fn($q) => $q['question'] ?? $q['title'] ?? '')->filter()->join(' | ') . "\n";
+                }
+            }
+        } catch (\Throwable $e) {
+            $summary .= "\n## SERP\nFailed: {$e->getMessage()}\n";
+        }
+
+        $summary .= "\n---\nBased on the above, suggest 3-5 ranked article ideas with template type and reasoning. Prioritize: (1) activities that book well need great guides, (2) supply gaps with tourist demand = SEO now, (3) PAA questions with no good answer ranking.";
+
+        return $summary;
+    }
+
+    private function fetchArticleText(string $url): ?string
+    {
+        if (!$url) return null;
+        try {
+            $response = Http::timeout(15)->withHeaders(['User-Agent' => 'Mozilla/5.0 (compatible; Envago/1.0)'])->get($url);
+            if (!$response->successful()) return null;
+
+            $html = $response->body();
+            $html = preg_replace('/<script[^>]*>.*?<\/script>/si', '', $html);
+            $html = preg_replace('/<style[^>]*>.*?<\/style>/si', '', $html);
+            $text = strip_tags($html);
+            $text = preg_replace('/\s+/', ' ', $text);
+
+            return substr(trim($text), 0, 3000);
+        } catch (\Throwable $e) {
+            return null;
+        }
+    }
+
+    private function sanitizeUtf8(mixed $data): mixed
+    {
+        if (is_string($data)) {
+            return mb_scrub($data, 'UTF-8');
+        }
+        if (is_array($data)) {
+            return array_map([$this, 'sanitizeUtf8'], $data);
+        }
+        return $data;
     }
 }

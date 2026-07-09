@@ -13,6 +13,39 @@ class ApifyService
     private const MAX_BYTES   = 100 * 1024 * 1024; // 100 MB
     private const TIMEOUT_SEC = 90;
 
+    public function fetchYouTubeTranscript(string $videoId): ?string
+    {
+        $token = config('services.apify.token');
+        if (!$token) return null;
+
+        try {
+            $response = Http::timeout(30)->post(
+                "https://api.apify.com/v2/acts/pintostudio~youtube-transcript-scraper/run-sync-get-dataset-items?token={$token}",
+                ['videoUrl' => "https://www.youtube.com/watch?v={$videoId}"]
+            );
+
+            if (!$response->successful() && $response->status() !== 201) {
+                Log::warning('apify: transcript fetch failed', [
+                    'video_id' => $videoId,
+                    'status'   => $response->status(),
+                    'body'     => substr($response->body(), 0, 300),
+                ]);
+                return null;
+            }
+
+            $items = $response->json();
+            if (empty($items)) return null;
+
+            $segments = $items[0]['data'] ?? $items[0]['searchResult'] ?? [];
+            if (empty($segments)) return null;
+
+            return collect($segments)->pluck('text')->join(' ');
+        } catch (\Throwable $e) {
+            Log::error('apify: transcript exception', ['video_id' => $videoId, 'error' => $e->getMessage()]);
+            return null;
+        }
+    }
+
     public function scrapeInstagramVideo(string $url): ?array
     {
         $token = config('services.apify.token');
