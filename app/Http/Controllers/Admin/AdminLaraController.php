@@ -223,7 +223,9 @@ class AdminLaraController extends Controller
             ->leftJoin('categories', 'categories.id', '=', 'activities.category_id')
             ->select('activities.name', 'activities.price', 'activities.city', 'activities.state',
                      'providers.business_name', 'categories.name as category_name')
-            ->where('activities.is_active', true);
+            ->where('activities.is_active', true)
+            ->whereNull('activities.deleted_at')
+            ->whereNull('providers.deleted_at');
 
         if (!empty($input['city'])) {
             $query->where('activities.city', 'like', '%' . $input['city'] . '%');
@@ -1028,6 +1030,8 @@ class AdminLaraController extends Controller
             ->leftJoin('categories', 'categories.id', '=', 'activities.category_id')
             ->select('activities.name', 'activities.price', 'categories.slug as category', 'activities.booking_method')
             ->where('activities.is_active', true)
+            ->whereNull('activities.deleted_at')
+            ->whereNull('providers.deleted_at')
             ->where('activities.city', 'like', '%' . $destination . '%')
             ->get();
 
