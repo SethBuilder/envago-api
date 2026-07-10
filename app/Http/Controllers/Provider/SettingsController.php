@@ -19,13 +19,10 @@ class SettingsController extends Controller
         $request->validate([
             'logo'                 => 'nullable|image|mimes:jpeg,png,jpg,gif,webp|max:2048',
             'whatsapp_number'      => 'nullable|string|max:20',
+            'bank_pix_key'         => 'nullable|string|max:120',
             'bank_beneficiary'     => 'nullable|string|max:120',
             'bank_cpf_cnpj'        => 'nullable|string|max:20',
             'bank_name'            => 'nullable|string|max:80',
-            'bank_address'         => 'nullable|string|max:160',
-            'bank_city'            => 'nullable|string|max:80',
-            'bank_state'           => 'nullable|string|max:2',
-            'bank_postcode'        => 'nullable|string|max:10',
             'bank_account_type'    => 'nullable|in:corrente,poupanca',
             'bank_swift'           => 'nullable|string|max:20',
             'bank_branch'          => 'nullable|string|max:20',
@@ -55,13 +52,10 @@ class SettingsController extends Controller
         }
 
         $bankDetails = array_filter([
+            'pix_key'      => $request->bank_pix_key,
             'beneficiary'  => $request->bank_beneficiary,
             'cpf_cnpj'     => $request->bank_cpf_cnpj,
             'bank_name'    => $request->bank_name,
-            'address'      => $request->bank_address,
-            'city'         => $request->bank_city,
-            'state'        => $request->bank_state ? strtoupper($request->bank_state) : null,
-            'postcode'     => $request->bank_postcode,
             'account_type' => $request->bank_account_type,
             'swift'        => $request->bank_swift ? strtoupper($request->bank_swift) : null,
             'branch'       => $request->bank_branch,

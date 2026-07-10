@@ -150,20 +150,19 @@
     </div>
   </form>
 
-  {{-- Bank details form --}}
+  {{-- Payment details form --}}
   <form method="POST" action="{{ route('provider.settings.update') }}" id="settings-form">
     @csrf @method('PUT')
 
-    {{-- Bank details --}}
     <div class="cfg-section">
       <div class="cfg-section-head" style="display:flex;align-items:flex-start;justify-content:space-between;">
         <div>
-          <div class="cfg-section-title">Dados bancários</div>
-          <div class="cfg-section-desc">Para receber repasses via transferência bancária</div>
+          <div class="cfg-section-title">Pagamentos</div>
+          <div class="cfg-section-desc">Como você recebe seus repasses do Envago</div>
         </div>
         <div style="display:flex;align-items:center;gap:8px;margin-top:2px;">
-          @if(!empty($bank))
-            <span class="badge badge-confirmed" style="font-size:11px;">✓ Cadastrado</span>
+          @if(!empty($bank['pix_key']) || !empty($bank['account']))
+            <span style="font-size:11px;background:#f0fdf4;color:#166534;border:1px solid #bbf7d0;padding:3px 8px;border-radius:20px;font-weight:600;">✓ Cadastrado</span>
           @endif
           <button type="button" id="bank-edit-btn" onclick="enableEdit()" class="cfg-btn cfg-btn-ghost" style="padding:6px 12px;font-size:12px;">
             <svg width="12" height="12" fill="none" viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
@@ -173,7 +172,7 @@
       </div>
       <div class="cfg-divider"></div>
 
-      {{-- Empty state shown when no bank data and not editing --}}
+      {{-- Empty state --}}
       @if(empty($bank))
       <div id="bank-empty" class="cfg-body" style="padding-bottom:20px;">
         <div class="bank-empty">
@@ -185,85 +184,78 @@
       </div>
       @endif
 
-      {{-- Fields — always in DOM, hidden when empty and not editing --}}
       <div id="bank-fields" class="cfg-body" @if(empty($bank)) style="display:none;" @endif>
 
-        <div class="field-group">
-          <label class="field-label">Nome do beneficiário</label>
-          <input type="text" name="bank_beneficiary" value="{{ old('bank_beneficiary', $bank['beneficiary'] ?? '') }}"
-            placeholder="Nome completo ou razão social" disabled class="field-input">
-        </div>
-
-        <div class="field-col2">
-          <div class="field-group">
-            <label class="field-label">CPF / CNPJ</label>
-            <input type="text" name="bank_cpf_cnpj" value="{{ old('bank_cpf_cnpj', $bank['cpf_cnpj'] ?? '') }}"
-              placeholder="000.000.000-00" disabled class="field-input">
+        {{-- PIX — primary --}}
+        <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:10px;padding:14px 16px;">
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">
+            <span style="font-size:12px;font-weight:700;color:#166534;background:#dcfce7;padding:2px 8px;border-radius:20px;">PIX · Primário</span>
+            <span style="font-size:12px;color:#4ade80;">Repasse instantâneo</span>
           </div>
           <div class="field-group">
-            <label class="field-label">Banco</label>
-            <input type="text" name="bank_name" value="{{ old('bank_name', $bank['bank_name'] ?? '') }}"
-              placeholder="ex: Itaú, Nubank" disabled class="field-input">
+            <label class="field-label">Chave PIX</label>
+            <input type="text" name="bank_pix_key" value="{{ old('bank_pix_key', $bank['pix_key'] ?? '') }}"
+              placeholder="CPF, CNPJ, e-mail, telefone ou chave aleatória" disabled class="field-input">
+            <span style="font-size:12px;color:#888;margin-top:3px;">Qualquer tipo de chave PIX cadastrada no seu banco</span>
           </div>
         </div>
 
-        <div class="field-group">
-          <label class="field-label">Endereço</label>
-          <input type="text" name="bank_address" value="{{ old('bank_address', $bank['address'] ?? '') }}"
-            placeholder="ex: Rua das Dunas, 123" disabled class="field-input">
-        </div>
+        {{-- Bank transfer — fallback --}}
+        <div style="margin-top:4px;">
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;">
+            <div style="flex:1;height:1px;background:#f0f0f0;"></div>
+            <span style="font-size:11px;font-weight:600;color:#aaa;white-space:nowrap;">TRANSFERÊNCIA BANCÁRIA (ALTERNATIVO)</span>
+            <div style="flex:1;height:1px;background:#f0f0f0;"></div>
+          </div>
 
-        <div class="field-col3-1">
-          <div class="field-group">
-            <label class="field-label">Cidade</label>
-            <input type="text" name="bank_city" value="{{ old('bank_city', $bank['city'] ?? '') }}"
-              placeholder="ex: Jericoacoara" disabled class="field-input">
-          </div>
-          <div class="field-group">
-            <label class="field-label">Estado (UF)</label>
-            <input type="text" name="bank_state" value="{{ old('bank_state', $bank['state'] ?? '') }}"
-              placeholder="CE" maxlength="2" disabled class="field-input">
-          </div>
-        </div>
+          <div style="display:flex;flex-direction:column;gap:14px;">
+            <div class="field-group">
+              <label class="field-label">Nome do beneficiário</label>
+              <input type="text" name="bank_beneficiary" value="{{ old('bank_beneficiary', $bank['beneficiary'] ?? '') }}"
+                placeholder="Nome completo ou razão social" disabled class="field-input">
+            </div>
 
-        <div class="field-col2">
-          <div class="field-group">
-            <label class="field-label">CEP</label>
-            <input type="text" name="bank_postcode" value="{{ old('bank_postcode', $bank['postcode'] ?? '') }}"
-              placeholder="62598-000" disabled class="field-input">
-          </div>
-          <div class="field-group">
-            <label class="field-label">Tipo de conta</label>
-            <select name="bank_account_type" disabled class="field-input">
-              <option value="">Selecionar...</option>
-              <option value="corrente" {{ old('bank_account_type', $bank['account_type'] ?? '') === 'corrente' ? 'selected' : '' }}>Conta Corrente</option>
-              <option value="poupanca" {{ old('bank_account_type', $bank['account_type'] ?? '') === 'poupanca' ? 'selected' : '' }}>Conta Poupança</option>
-            </select>
-          </div>
-        </div>
+            <div class="field-col2">
+              <div class="field-group">
+                <label class="field-label">CPF / CNPJ</label>
+                <input type="text" name="bank_cpf_cnpj" value="{{ old('bank_cpf_cnpj', $bank['cpf_cnpj'] ?? '') }}"
+                  placeholder="000.000.000-00" disabled class="field-input">
+              </div>
+              <div class="field-group">
+                <label class="field-label">Banco</label>
+                <input type="text" name="bank_name" value="{{ old('bank_name', $bank['bank_name'] ?? '') }}"
+                  placeholder="ex: Itaú, Nubank" disabled class="field-input">
+              </div>
+            </div>
 
-        <div class="field-col2">
-          <div class="field-group">
-            <label class="field-label">SWIFT / BIC</label>
-            <input type="text" name="bank_swift" value="{{ old('bank_swift', $bank['swift'] ?? '') }}"
-              placeholder="ex: ITAUBRSP" disabled class="field-input" style="font-family:monospace;letter-spacing:.5px;">
-          </div>
-          <div class="field-group">
-            <label class="field-label">Agência</label>
-            <input type="text" name="bank_branch" value="{{ old('bank_branch', $bank['branch'] ?? '') }}"
-              placeholder="ex: 0001" disabled class="field-input">
-          </div>
-        </div>
+            <div class="field-col2">
+              <div class="field-group">
+                <label class="field-label">Agência</label>
+                <input type="text" name="bank_branch" value="{{ old('bank_branch', $bank['branch'] ?? '') }}"
+                  placeholder="ex: 0001" disabled class="field-input">
+              </div>
+              <div class="field-group">
+                <label class="field-label">Número da conta</label>
+                <input type="text" name="bank_account" value="{{ old('bank_account', $bank['account'] ?? '') }}"
+                  placeholder="ex: 12345-6" disabled class="field-input">
+              </div>
+            </div>
 
-        <div class="field-col3-1">
-          <div class="field-group">
-            <label class="field-label">Número da conta</label>
-            <input type="text" name="bank_account" value="{{ old('bank_account', $bank['account'] ?? '') }}"
-              placeholder="ex: 12345-6" disabled class="field-input">
-          </div>
-          <div class="field-group">
-            <label class="field-label">País</label>
-            <input type="text" value="Brasil" disabled data-always-disabled class="field-input">
+            <div class="field-col2">
+              <div class="field-group">
+                <label class="field-label">Tipo de conta</label>
+                <select name="bank_account_type" disabled class="field-input">
+                  <option value="">Selecionar...</option>
+                  <option value="corrente" {{ old('bank_account_type', $bank['account_type'] ?? '') === 'corrente' ? 'selected' : '' }}>Conta Corrente</option>
+                  <option value="poupanca" {{ old('bank_account_type', $bank['account_type'] ?? '') === 'poupanca' ? 'selected' : '' }}>Conta Poupança</option>
+                </select>
+              </div>
+              <div class="field-group">
+                <label class="field-label">SWIFT / BIC</label>
+                <input type="text" name="bank_swift" value="{{ old('bank_swift', $bank['swift'] ?? '') }}"
+                  placeholder="ex: ITAUBRSP" disabled class="field-input" style="font-family:monospace;letter-spacing:.5px;">
+              </div>
+            </div>
           </div>
         </div>
 
