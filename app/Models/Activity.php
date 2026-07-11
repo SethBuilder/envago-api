@@ -57,7 +57,6 @@ class Activity extends Model
     {
         return $this->hasOne(Media::class)
             ->whereIn('type', ['cover', 'gallery'])
-            ->orderByRaw("CASE WHEN type = 'cover' THEN 0 ELSE 1 END")
             ->orderBy('order');
     }
 

@@ -58,7 +58,10 @@
 .photo-drop { border:2px dashed #e0e0e0;border-radius:12px;padding:32px 24px;text-align:center;cursor:pointer;transition:all .2s;background:#fafafa; }
 .photo-drop:hover,.photo-drop.drag-over { border-color:#111;background:#fff; }
 .photo-grid { display:grid;grid-template-columns:repeat(auto-fill,minmax(100px,1fr));gap:10px;margin-top:12px; }
-.photo-thumb { position:relative;aspect-ratio:1;border-radius:8px;overflow:hidden;border:1px solid #e8e8e8;background:#f5f5f5; }
+.media-grid { display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:10px;margin-top:12px;align-items:start; }
+.photo-thumb { position:relative;aspect-ratio:1;border-radius:8px;overflow:hidden;border:1px solid #e8e8e8;background:#f5f5f5;cursor:grab; }
+.photo-thumb.sortable-ghost { opacity:.35;border:2px dashed #aaa; }
+.photo-thumb.sortable-drag  { cursor:grabbing; }
 .photo-thumb img { width:100%;height:100%;object-fit:cover; }
 .photo-thumb-remove { position:absolute;top:4px;right:4px;width:22px;height:22px;border-radius:50%;background:rgba(0,0,0,.55);border:none;color:#fff;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:background .15s; }
 .photo-thumb-remove:hover { background:rgba(220,38,38,.9); }
@@ -69,7 +72,9 @@
 .video-drop { border:2px dashed #e0e0e0;border-radius:12px;padding:32px 24px;text-align:center;cursor:pointer;transition:all .2s;background:#fafafa; }
 .video-drop:hover,.video-drop.drag-over { border-color:#111;background:#fff; }
 .video-grid { display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:10px;margin-top:12px; }
-.video-thumb { position:relative;aspect-ratio:16/9;border-radius:8px;overflow:hidden;border:1px solid #e8e8e8;background:#111;display:flex;align-items:center;justify-content:center; }
+.video-thumb { position:relative;aspect-ratio:16/9;border-radius:8px;overflow:hidden;border:1px solid #e8e8e8;background:#111;display:flex;align-items:center;justify-content:center;cursor:grab; }
+.video-thumb.sortable-ghost { opacity:.35;border:2px dashed #aaa; }
+.video-thumb.sortable-drag  { cursor:grabbing; }
 .video-thumb video,.video-thumb img { width:100%;height:100%;object-fit:cover; }
 .video-thumb-remove { position:absolute;top:4px;right:4px;width:22px;height:22px;border-radius:50%;background:rgba(0,0,0,.55);border:none;color:#fff;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:background .15s;z-index:10; }
 .video-thumb-remove:hover { background:rgba(220,38,38,.9); }
@@ -292,43 +297,40 @@
     <div class="step-body">
 
       {{-- Existing photos --}}
-      <div class="photo-grid" id="existing-photo-grid">
-        @foreach($activity->media->whereIn('type', ['cover', 'gallery']) as $media)
-          <div class="photo-thumb" id="em-{{ $media->id }}">
-            <img src="{{ $media->url }}" alt="">
-            @if($media->type === 'cover')
-              <span class="photo-first-badge">CAPA</span>
-            @endif
-            <span class="photo-existing-badge">Salva</span>
-            <button type="button" class="photo-thumb-remove" onclick="markDeleteMedia({{ $media->id }})">
-              <svg width="10" height="10" fill="none" stroke="currentColor" stroke-width="3" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-            </button>
-          </div>
-        @endforeach
-      </div>
-      <div id="delete-media-inputs"></div>
-
-      {{-- Existing videos --}}
-      @if($activity->media->where('type','video')->count() > 0)
-      <div class="video-grid" id="existing-video-grid">
-        @foreach($activity->media->where('type','video') as $media)
-          <div class="video-thumb" id="em-{{ $media->id }}">
-            @if($media->poster_url)
-              <img src="{{ $media->poster_url }}" alt="">
-            @else
-              <div style="width:100%;height:100%;background:#1a1a1a;"></div>
-            @endif
-            <div class="video-play-icon">
-              <svg width="28" height="28" fill="white" viewBox="0 0 24 24"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+      @if($activity->media->count() > 0)
+      <div class="media-grid" id="existing-media-grid">
+        @foreach($activity->media->sortBy('order') as $media)
+          @if(in_array($media->type, ['cover', 'gallery']))
+            <div class="photo-thumb" id="em-{{ $media->id }}" data-media-id="{{ $media->id }}">
+              <img src="{{ $media->url }}" alt="">
+              @if($loop->first)
+                <span class="photo-first-badge">CAPA</span>
+              @endif
+              <span class="photo-existing-badge">Salva</span>
+              <button type="button" class="photo-thumb-remove" onclick="markDeleteMedia({{ $media->id }})">
+                <svg width="10" height="10" fill="none" stroke="currentColor" stroke-width="3" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+              </button>
             </div>
-            <span class="video-existing-badge">Salvo</span>
-            <button type="button" class="video-thumb-remove" onclick="markDeleteMedia({{ $media->id }})">
-              <svg width="10" height="10" fill="none" stroke="currentColor" stroke-width="3" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-            </button>
-          </div>
+          @else
+            <div class="video-thumb" id="em-{{ $media->id }}" data-media-id="{{ $media->id }}">
+              @if($media->poster_url)
+                <img src="{{ $media->poster_url }}" alt="">
+              @else
+                <div style="width:100%;height:100%;background:#1a1a1a;"></div>
+              @endif
+              <div class="video-play-icon">
+                <svg width="28" height="28" fill="white" viewBox="0 0 24 24"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+              </div>
+              <span class="video-existing-badge">Salvo</span>
+              <button type="button" class="video-thumb-remove" onclick="markDeleteMedia({{ $media->id }})">
+                <svg width="10" height="10" fill="none" stroke="currentColor" stroke-width="3" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+              </button>
+            </div>
+          @endif
         @endforeach
       </div>
       @endif
+      <div id="delete-media-inputs"></div>
 
       {{-- Combined upload drop zone --}}
       <input type="file" id="media-input" accept="image/*,video/mp4,video/quicktime,video/webm" multiple style="display:none;"
@@ -719,6 +721,34 @@ function showGeneralError(msg) {
 }
 </script>
 <style>@keyframes spin{to{transform:rotate(360deg)}}</style>
+
+<script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.2/Sortable.min.js"></script>
+<script>
+(function() {
+  const csrfToken = document.querySelector('[name=_token]').value;
+  const reorderUrl = '{{ route('provider.activities.media.reorder', $activity) }}';
+
+  function saveOrder(grid) {
+    const ids = [...grid.querySelectorAll('[data-media-id]')].map(el => el.dataset.mediaId);
+    if (ids.length < 2) return;
+    fetch(reorderUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': csrfToken },
+      body: JSON.stringify({ ids }),
+    });
+  }
+
+  const mediaGrid = document.getElementById('existing-media-grid');
+  if (mediaGrid && mediaGrid.querySelectorAll('[data-media-id]').length > 1) {
+    Sortable.create(mediaGrid, {
+      animation: 150,
+      ghostClass: 'sortable-ghost',
+      dragClass: 'sortable-drag',
+      onEnd: () => saveOrder(mediaGrid),
+    });
+  }
+})();
+</script>
 @endpush
 
 @endsection

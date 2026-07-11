@@ -219,6 +219,20 @@ class ActivityController extends Controller
         ]);
     }
 
+    public function reorderMedia(Request $request, Activity $activity)
+    {
+        $ids   = array_filter(array_map('intval', (array) $request->input('ids', [])));
+        $valid = $activity->media()->whereIn('id', $ids)->pluck('id')->flip();
+
+        foreach (array_values($ids) as $i => $id) {
+            if ($valid->has($id)) {
+                \App\Models\Media::where('id', $id)->update(['order' => $i]);
+            }
+        }
+
+        return response()->json(['ok' => true]);
+    }
+
     private function downloadUrlToTemp(string $url, string $sessionId, int $index): ?string
     {
         try {
