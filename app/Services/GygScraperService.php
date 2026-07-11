@@ -25,9 +25,17 @@ class GygScraperService
     {
         $parsed = parse_url($gygUrl);
         parse_str($parsed['query'] ?? '', $params);
-        $params['partner_id']   = self::GYG_PARTNER_ID;
-        $params['utm_medium']   = 'online_publisher';
-        $base = ($parsed['scheme'] ?? 'https') . '://' . ($parsed['host'] ?? 'www.getyourguide.com') . ($parsed['path'] ?? '');
+        $params['partner_id'] = self::GYG_PARTNER_ID;
+        $params['utm_medium'] = 'online_publisher';
+
+        // Normalize locale to pt-br (replace /xx/ or /xx-xx/ prefix, or add if missing)
+        $path = $parsed['path'] ?? '/';
+        $path = preg_replace('#^/[a-z]{2}(?:-[a-z]{2})?/#i', '/pt-br/', $path);
+        if (!str_starts_with($path, '/pt-br/')) {
+            $path = '/pt-br' . $path;
+        }
+
+        $base = ($parsed['scheme'] ?? 'https') . '://' . ($parsed['host'] ?? 'www.getyourguide.com') . $path;
         return $base . '?' . http_build_query($params);
     }
 
