@@ -65,6 +65,12 @@
                 </form>
               @endif
               <a href="{{ route('admin.providers.show', $provider) }}" class="btn btn-ghost" style="font-size:12px; padding:5px 14px;">Ver detalhes</a>
+            @else
+              <form method="POST" action="{{ route('admin.providers.force-destroy', $provider) }}"
+                    onsubmit="return confirm('Apagar {{ addslashes($provider->business_name) }} permanentemente? Não pode ser desfeito.')">
+                @csrf @method('DELETE')
+                <button type="submit" style="background:none;border:none;color:#e53e3e;cursor:pointer;font-size:13px;padding:0;">Apagar</button>
+              </form>
             @endif
           </td>
         </tr>

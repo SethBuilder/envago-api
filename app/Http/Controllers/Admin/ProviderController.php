@@ -86,6 +86,14 @@ class ProviderController extends Controller
         return redirect()->route('admin.providers')->with('success', "Operador \"{$name}\" arquivado.");
     }
 
+    public function forceDestroy(Provider $provider)
+    {
+        $name = $provider->business_name;
+        $provider->forceDelete();
+
+        return redirect()->route('admin.providers')->with('success', "Operador \"{$name}\" apagado permanentemente.");
+    }
+
     public function destroyActivity(Provider $provider, Activity $activity)
     {
         $name = $activity->name;

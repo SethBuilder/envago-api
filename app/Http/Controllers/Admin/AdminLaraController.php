@@ -1229,16 +1229,23 @@ class AdminLaraController extends Controller
         ]);
 
         // Step 7: Store reviews
+        $reviews = $this->translateReviews($reviews);
+        $gygGenericNames = ['gyg traveler', 'getyourguide traveler', 'anonymous', 'traveler', 'traveller'];
         $savedReviews = 0;
         foreach (array_slice($reviews, 0, 10) as $review) {
             $body = trim($review['body'] ?? '');
             if (!$body) continue;
 
+            $authorRaw = $review['author'] ?? '';
+            $author = (empty($authorRaw) || in_array(strtolower($authorRaw), $gygGenericNames))
+                ? 'Viajante'
+                : $authorRaw;
+
             $rating = max(1, min(5, (int) round((float) ($review['rating'] ?? 5))));
 
             DB::table('reviews')->insert([
                 'activity_id'  => $activityId,
-                'author_name'  => $review['author'] ?? 'Viajante',
+                'author_name'  => $author,
                 'rating'       => $rating,
                 'body'         => $body,
                 'source'       => 'scraped',
@@ -1295,5 +1302,38 @@ class AdminLaraController extends Controller
             return array_map([$this, 'sanitizeUtf8'], $data);
         }
         return $data;
+    }
+
+    private function translateReviews(array $reviews): array
+    {
+        if (empty($reviews)) return $reviews;
+
+        $bodies = array_map(fn($r) => $r['body'] ?? '', $reviews);
+        $list   = implode("\n---\n", $bodies);
+
+        $response = \Illuminate\Support\Facades\Http::timeout(60)->withHeaders([
+            'x-api-key'         => env('ANTHROPIC_API_KEY'),
+            'anthropic-version' => '2023-06-01',
+            'content-type'      => 'application/json',
+        ])->post('https://api.anthropic.com/v1/messages', [
+            'model'      => 'claude-haiku-4-5-20251001',
+            'max_tokens' => 2048,
+            'messages'   => [[
+                'role'    => 'user',
+                'content' => "Translate the following tour reviews to Brazilian Portuguese (PT-BR). If a review is already in PT-BR, keep it as-is. Return ONLY the translated reviews separated by ---\n\n{$list}",
+            ]],
+        ]);
+
+        if (!$response->successful()) return $reviews;
+
+        $translated = explode('---', trim($response->json('content.0.text') ?? ''));
+
+        foreach ($reviews as $i => $review) {
+            if (!empty(trim($translated[$i] ?? ''))) {
+                $reviews[$i]['body'] = trim($translated[$i]);
+            }
+        }
+
+        return $reviews;
     }
 }
