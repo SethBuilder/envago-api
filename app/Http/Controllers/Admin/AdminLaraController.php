@@ -1196,26 +1196,16 @@ class AdminLaraController extends Controller
             $providerNote = "Created new unclaimed provider ID {$providerId} ({$operatorName}).";
         }
 
-        // Step 5: AI description rewrite
-        $description = '';
-        if ($rawDesc) {
-            $description = $gyg->rewriteDescription($rawDesc, $title, $city, $categoryName);
-        }
-
-        // Step 6: Extract highlights
-        $highlights = $description ? $gyg->extractHighlights($description, $title) : [];
-
-        // Step 7: Build affiliate URL
+        // Step 5: Build affiliate URL
         $affiliateUrl = $gyg->buildAffiliateUrl($url);
 
-        // Step 8: Create activity
+        // Step 6: Create activity
         $activitySlug = Str::slug($title);
         $existing     = DB::table('activities')->where('slug', $activitySlug)->first();
         if ($existing) {
             $activitySlug .= '-' . Str::random(4);
         }
 
-        $price    = $gyg->parsePrice($rawPrice);
         $duration = $gyg->parseDuration($rawDuration);
 
         $activityId = DB::table('activities')->insertGetId([
@@ -1223,9 +1213,9 @@ class AdminLaraController extends Controller
             'category_id'      => $category->id,
             'name'             => $title,
             'slug'             => $activitySlug,
-            'description'      => $description ?: null,
-            'highlights'       => $highlights ? json_encode($highlights) : null,
-            'price'            => $price,
+            'description'      => $rawDesc ?: null,
+            'highlights'       => null,
+            'price'            => 0,
             'pricing_type'     => 'per_person',
             'duration_minutes' => $duration,
             'capacity'         => 20,
@@ -1238,26 +1228,7 @@ class AdminLaraController extends Controller
             'updated_at'       => now(),
         ]);
 
-        // Step 9: Download and store photos
-        $downloadedPhotos = 0;
-        $order = 0;
-        foreach (array_slice($photos, 0, 8) as $i => $photoUrl) {
-            $storedUrl = $gyg->downloadPhoto($photoUrl, $activitySlug, $i + 1);
-            if (!$storedUrl) continue;
-
-            $type = ($order === 0) ? 'cover' : 'photo';
-            DB::table('media')->insert([
-                'activity_id'  => $activityId,
-                'type'         => $type,
-                'url'          => $storedUrl,
-                'order'        => $order++,
-                'created_at'   => now(),
-                'updated_at'   => now(),
-            ]);
-            $downloadedPhotos++;
-        }
-
-        // Step 10: Store reviews
+        // Step 7: Store reviews
         $savedReviews = 0;
         foreach (array_slice($reviews, 0, self::MAX_REVIEWS ?? 10) as $review) {
             $body = trim($review['body'] ?? '');
@@ -1290,11 +1261,9 @@ class AdminLaraController extends Controller
             "Provider: {$providerNote}",
             "Operator page: {$pageUrl}",
             "Category: {$categoryName} ({$categorySlug}){$newCategory}",
-            "Price: R\$ " . number_format($price, 2, ',', '.') . " | Duration: {$duration} min",
-            "Photos: {$downloadedPhotos} downloaded",
-            "Reviews: {$savedReviews} imported",
-            $description ? null : "⚠️ No description found on GYG page — add manually.",
-            $price <= 0 ? "⚠️ Price could not be extracted — update manually." : null,
+            "Duration: {$duration} min | Reviews: {$savedReviews} imported",
+            "⚠️ Price = 0 — update manually via Ver como operador.",
+            $rawDesc ? "Description saved as-is — use AI button to rewrite to PT-BR." : "⚠️ No description found — add manually.",
         ]));
     }
 

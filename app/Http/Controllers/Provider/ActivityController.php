@@ -219,7 +219,7 @@ class ActivityController extends Controller
             'max_tokens' => 600,
             'messages'   => [[
                 'role'    => 'user',
-                'content' => "Você é um redator especializado em turismo no Brasil. Reescreva esta descrição de passeio em Markdown estruturado para ser mais atraente e profissional para turistas.\n\nRegras de formatação:\n- Use ## para seções (ex: ## O que está incluído, ## O que esperar, ## Informações importantes)\n- Use **negrito** para destacar pontos-chave\n- Use listas com - para itens incluídos/excluídos\n- Parágrafo de abertura convidativo sem título\n- PT-BR, tom amigável e convidativo\n- Máx 400 palavras\n- Retorne apenas o Markdown, sem comentários ou aspas\n\nDescrição original:\n{$description}",
+                'content' => "Você é um redator especializado em turismo no Brasil. Reescreva esta descrição de passeio em Markdown estruturado para ser mais atraente e profissional para turistas.\n\nRegras de formatação:\n- Se a descrição original estiver em inglês, traduza para PT-BR\n- Use ## para seções (ex: ## O que está incluído, ## O que esperar, ## Informações importantes)\n- Use **negrito** para destacar pontos-chave\n- Use listas com - para itens incluídos/excluídos\n- Parágrafo de abertura convidativo sem título\n- PT-BR, tom amigável e convidativo\n- Máx 400 palavras\n- Retorne apenas o Markdown, sem comentários ou aspas\n\nDescrição original:\n{$description}",
             ]],
         ]);
 

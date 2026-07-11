@@ -6,7 +6,7 @@ use Illuminate\Database\Eloquent\Model;
 
 class OutboundClick extends Model
 {
-    protected $fillable = ['activity_id', 'type', 'destination', 'category'];
+    protected $fillable = ['activity_id', 'type', 'destination', 'category', 'name', 'email', 'whatsapp'];
 
     public function activity()
     {

@@ -13,6 +13,9 @@ class ClickController extends Controller
     {
         $request->validate([
             'activity_id' => 'required|integer|exists:activities,id',
+            'name'        => 'nullable|string|max:120',
+            'email'       => 'nullable|email|max:120',
+            'whatsapp'    => 'nullable|string|max:30',
         ]);
 
         $activity = Activity::find($request->activity_id);
@@ -26,6 +29,9 @@ class ClickController extends Controller
             'type'        => $activity->booking_method,
             'destination' => $activity->city,
             'category'    => $activity->category?->slug,
+            'name'        => $request->name,
+            'email'       => $request->email,
+            'whatsapp'    => $request->whatsapp,
         ]);
 
         return response()->json(['ok' => true, 'url' => $activity->link_url]);
