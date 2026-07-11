@@ -276,6 +276,34 @@ class ActivityController extends Controller
         return response()->json(['description' => trim($res->json('content.0.text') ?? '')]);
     }
 
+    public function aiEnhanceName(Request $request)
+    {
+        $name = trim($request->input('name', ''));
+        if (empty($name)) {
+            return response()->json(['error' => 'Nome vazio.'], 422);
+        }
+
+        $res = Http::timeout(30)->withHeaders([
+            'x-api-key'         => env('ANTHROPIC_API_KEY'),
+            'anthropic-version' => '2023-06-01',
+            'content-type'      => 'application/json',
+        ])->post('https://api.anthropic.com/v1/messages', [
+            'model'      => 'claude-haiku-4-5-20251001',
+            'max_tokens' => 60,
+            'messages'   => [[
+                'role'    => 'user',
+                'content' => "Traduza e formate este nome de passeio turístico para PT-BR. Regras: título curto e atraente, em português do Brasil, capitalização correta (cada palavra importante em maiúscula), sem aspas nem pontuação no final, retorne APENAS o nome traduzido sem mais nada.\n\nNome original: {$name}",
+            ]],
+        ]);
+
+        if (!$res->ok()) {
+            Log::error('ai.enhance-name failed', ['status' => $res->status()]);
+            return response()->json(['error' => 'Erro ao chamar IA. Tente novamente.'], 500);
+        }
+
+        return response()->json(['name' => trim($res->json('content.0.text') ?? '')]);
+    }
+
     public function aiExtractHighlights(Request $request)
     {
         $description = trim($request->input('description', ''));

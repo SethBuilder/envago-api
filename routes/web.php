@@ -99,6 +99,7 @@ Route::middleware(['auth', 'provider'])->prefix('provider')->name('provider.')->
     Route::post('/passeios',                     [ProviderActivity::class,  'store'])->name('activities.store');
     Route::get('/passeios/{activity}/editar',    [ProviderActivity::class,  'edit'])->name('activities.edit');
     Route::post('/passeios/{activity}',          [ProviderActivity::class,  'update'])->name('activities.update');
+    Route::post('/ai/enhance-name',              [ProviderActivity::class,  'aiEnhanceName'])->name('activities.ai.enhance-name');
     Route::post('/ai/enhance-description',       [ProviderActivity::class,  'aiEnhanceDescription'])->name('activities.ai.enhance');
     Route::post('/ai/extract-highlights',        [ProviderActivity::class,  'aiExtractHighlights'])->name('activities.ai.highlights');
     Route::post('/bookings/cancel',              [ProviderDashboard::class, 'cancelBookings'])->name('bookings.cancel');

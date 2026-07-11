@@ -115,7 +115,13 @@
     <div class="step-body">
 
       <div class="f-group">
-        <label class="f-label">Nome do passeio <span style="color:#ff2924">*</span></label>
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:5px;">
+          <label class="f-label" style="margin:0;">Nome do passeio <span style="color:#ff2924">*</span></label>
+          <button type="button" id="btn-enhance-name" onclick="aiEnhanceName()"
+            style="font-size:11px;padding:4px 10px;border-radius:6px;border:1px solid #e0e0e0;background:#fafafa;color:#666;cursor:pointer;display:flex;align-items:center;gap:4px;line-height:1;">
+            ✨ Traduzir com IA
+          </button>
+        </div>
         <input type="text" name="name" value="{{ $activity->name }}"
           class="f-input" maxlength="120" autocomplete="off" id="f-name">
         <span class="f-error" id="err-name"></span>
@@ -577,6 +583,25 @@ function removeTime(id, ts) {
 }
 
 // ── AI helpers ────────────────────────────────────────────────
+async function aiEnhanceName() {
+  const inp = document.getElementById('f-name');
+  const btn = document.getElementById('btn-enhance-name');
+  const name = inp.value.trim();
+  if (!name) { alert('Adicione um nome primeiro.'); return; }
+  btn.disabled = true; btn.textContent = 'Traduzindo...';
+  try {
+    const res = await fetch('{{ route('provider.activities.ai.enhance-name') }}', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': document.querySelector('[name=_token]').value },
+      body: JSON.stringify({ name }),
+    });
+    const data = await res.json();
+    if (data.name) inp.value = data.name;
+    else alert(data.error || 'Erro ao traduzir nome.');
+  } catch { alert('Erro de conexão.'); }
+  btn.disabled = false; btn.innerHTML = '✨ Traduzir com IA';
+}
+
 async function aiEnhanceDescription() {
   const ta = document.getElementById('f-description');
   const btn = document.getElementById('btn-enhance-desc');
