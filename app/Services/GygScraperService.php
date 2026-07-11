@@ -25,8 +25,9 @@ class GygScraperService
     {
         $parsed = parse_url($gygUrl);
         parse_str($parsed['query'] ?? '', $params);
-        $params['partner_id'] = self::GYG_PARTNER_ID;
-        $params['utm_medium'] = 'online_publisher';
+        $params['partner_id']       = self::GYG_PARTNER_ID;
+        $params['utm_medium']       = 'online_publisher';
+        $params['referral_redirect'] = '1';
 
         // Normalize locale to pt-br (replace /xx/ or /xx-xx/ prefix, or add if missing)
         $path = $parsed['path'] ?? '/';
