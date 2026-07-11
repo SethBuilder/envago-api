@@ -106,7 +106,9 @@ class ActivityController extends Controller
                 ] : null,
                 'cover_url'        => $activity->media->whereIn('type', ['cover', 'gallery'])->first()?->url,
                 'gallery'          => $activity->media->whereIn('type', ['cover', 'gallery'])->skip(1)->map(fn($m) => $m->url)->values(),
-                'videos'           => $activity->media->where('type', 'video')->map(fn($m) => [
+                'videos'           => $activity->media->where('type', 'video')->map(fn($m) => ['url' => $m->url, 'poster_url' => $m->poster_url, 'instagram_handle' => $m->instagram_handle])->values(),
+                'media'            => $activity->media->map(fn($m) => [
+                    'type'             => in_array($m->type, ['cover', 'gallery']) ? 'photo' : 'video',
                     'url'              => $m->url,
                     'poster_url'       => $m->poster_url,
                     'instagram_handle' => $m->instagram_handle,
