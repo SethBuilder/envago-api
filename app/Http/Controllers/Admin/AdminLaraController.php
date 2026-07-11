@@ -5,12 +5,15 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Models\ResearchData;
 use App\Services\ApifyService;
+use App\Services\GygScraperService;
 use App\Services\LaraService;
 use App\Services\YouTubeService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Str;
 
 class AdminLaraController extends Controller
 {
@@ -97,6 +100,7 @@ class AdminLaraController extends Controller
                 'research_destination'  => $this->toolResearchDestination($input),
                 'query_leads'           => $this->toolQueryLeads($input),
                 'suggest_articles'      => $this->toolSuggestArticles($input),
+                'scrape_gyg'            => $this->toolScrapeGyg($input),
                 default                 => "Unknown tool: {$name}",
             };
         };
@@ -1108,6 +1112,190 @@ class AdminLaraController extends Controller
         $summary .= "\n---\nBased on the above, suggest 3-5 ranked article ideas with template type and reasoning. Prioritize: (1) activities that book well need great guides, (2) supply gaps with tourist demand = SEO now, (3) PAA questions with no good answer ranking.";
 
         return $summary;
+    }
+
+    private function toolScrapeGyg(array $input): string
+    {
+        $url = trim($input['url'] ?? '');
+        if (!$url || !str_contains($url, 'getyourguide.com')) {
+            return 'Error: a valid GetYourGuide URL is required.';
+        }
+
+        $gyg = app(GygScraperService::class);
+
+        // Step 1: Scrape
+        try {
+            $data = $gyg->scrape($url);
+        } catch (\Throwable $e) {
+            Log::error('gyg: scrape failed', ['url' => $url, 'error' => $e->getMessage()]);
+            return "Scrape failed: {$e->getMessage()}";
+        }
+
+        $title        = $data['title']         ?? null;
+        $rawDesc      = $data['description']   ?? '';
+        $photos       = $data['photos']        ?? [];
+        $rawPrice     = $data['price']         ?? 0;
+        $rawDuration  = $data['durationMinutes'] ?? null;
+        $operatorName = $data['operatorName']  ?? null;
+        $breadcrumbs  = $data['categoryText']  ?? [];
+        $location     = $data['location']      ?? null;
+        $reviews      = $data['reviews']       ?? [];
+
+        if (!$title) return 'Error: could not extract activity title from the GYG page. The page may have changed structure.';
+
+        // Step 2: Category mapping
+        $categoryMap  = $gyg->mapCategory($breadcrumbs, $title);
+        $categorySlug = $categoryMap['slug'];
+        $categoryName = $categoryMap['name'];
+
+        $category = DB::table('categories')->where('slug', $categorySlug)->first();
+        if (!$category) {
+            $categoryId = DB::table('categories')->insertGetId([
+                'slug'       => $categorySlug,
+                'name'       => $categoryName,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+            $category = (object) ['id' => $categoryId, 'slug' => $categorySlug, 'name' => $categoryName];
+        }
+
+        // Step 3: Parse city/state from location
+        $city  = $location ? explode(',', $location)[0] : 'Jericoacoara';
+        $state = 'CE';
+
+        // Step 4: Create user + unclaimed provider
+        $operatorName = $operatorName ?: "Operador GYG — {$title}";
+        $providerSlug = Str::slug($operatorName);
+
+        $existingProvider = DB::table('providers')->where('slug', $providerSlug)->first();
+
+        if ($existingProvider) {
+            $providerId = $existingProvider->id;
+            $providerNote = "Using existing provider ID {$providerId} ({$operatorName}).";
+        } else {
+            $email    = 'gyg-' . $providerSlug . '@envago.live';
+            $userId   = DB::table('users')->insertGetId([
+                'name'              => $operatorName,
+                'email'             => $email,
+                'password'          => Hash::make(Str::random(32)),
+                'email_verified_at' => now(),
+                'created_at'        => now(),
+                'updated_at'        => now(),
+            ]);
+
+            $providerId = DB::table('providers')->insertGetId([
+                'user_id'       => $userId,
+                'business_name' => $operatorName,
+                'slug'          => $providerSlug,
+                'status'        => 'approved',
+                'claimed'       => false,
+                'created_at'    => now(),
+                'updated_at'    => now(),
+            ]);
+
+            $providerNote = "Created new unclaimed provider ID {$providerId} ({$operatorName}).";
+        }
+
+        // Step 5: AI description rewrite
+        $description = '';
+        if ($rawDesc) {
+            $description = $gyg->rewriteDescription($rawDesc, $title, $city, $categoryName);
+        }
+
+        // Step 6: Extract highlights
+        $highlights = $description ? $gyg->extractHighlights($description, $title) : [];
+
+        // Step 7: Build affiliate URL
+        $affiliateUrl = $gyg->buildAffiliateUrl($url);
+
+        // Step 8: Create activity
+        $activitySlug = Str::slug($title);
+        $existing     = DB::table('activities')->where('slug', $activitySlug)->first();
+        if ($existing) {
+            $activitySlug .= '-' . Str::random(4);
+        }
+
+        $price    = $gyg->parsePrice($rawPrice);
+        $duration = $gyg->parseDuration($rawDuration);
+
+        $activityId = DB::table('activities')->insertGetId([
+            'provider_id'      => $providerId,
+            'category_id'      => $category->id,
+            'name'             => $title,
+            'slug'             => $activitySlug,
+            'description'      => $description ?: null,
+            'highlights'       => $highlights ? json_encode($highlights) : null,
+            'price'            => $price,
+            'pricing_type'     => 'per_person',
+            'duration_minutes' => $duration,
+            'capacity'         => 20,
+            'city'             => $city,
+            'state'            => $state,
+            'is_active'        => true,
+            'booking_method'   => 'affiliate',
+            'link_url'         => $affiliateUrl,
+            'created_at'       => now(),
+            'updated_at'       => now(),
+        ]);
+
+        // Step 9: Download and store photos
+        $downloadedPhotos = 0;
+        $order = 0;
+        foreach (array_slice($photos, 0, 8) as $i => $photoUrl) {
+            $storedUrl = $gyg->downloadPhoto($photoUrl, $activitySlug, $i + 1);
+            if (!$storedUrl) continue;
+
+            $type = ($order === 0) ? 'cover' : 'photo';
+            DB::table('media')->insert([
+                'activity_id'  => $activityId,
+                'type'         => $type,
+                'url'          => $storedUrl,
+                'order'        => $order++,
+                'created_at'   => now(),
+                'updated_at'   => now(),
+            ]);
+            $downloadedPhotos++;
+        }
+
+        // Step 10: Store reviews
+        $savedReviews = 0;
+        foreach (array_slice($reviews, 0, self::MAX_REVIEWS ?? 10) as $review) {
+            $body = trim($review['body'] ?? '');
+            if (!$body) continue;
+
+            $rating = max(1, min(5, (int) round((float) ($review['rating'] ?? 5))));
+
+            DB::table('reviews')->insert([
+                'activity_id'  => $activityId,
+                'author_name'  => $review['author'] ?? 'Viajante',
+                'rating'       => $rating,
+                'body'         => $body,
+                'source'       => 'scraped',
+                'source_url'   => $url,
+                'is_approved'  => true,
+                'scraped_at'   => now(),
+                'created_at'   => now(),
+                'updated_at'   => now(),
+            ]);
+            $savedReviews++;
+        }
+
+        $pageUrl      = "https://envago.live/operadores/{$providerSlug}";
+        $activityUrl  = "https://envago.live/passeio/{$activitySlug}";
+        $newCategory  = $categoryMap['is_new'] ? " ⚠️ New category created: {$categoryName} ({$categorySlug})" : '';
+
+        return implode("\n", array_filter([
+            "✅ GYG activity scraped and created.",
+            "Activity: \"{$title}\" → {$activityUrl}",
+            "Provider: {$providerNote}",
+            "Operator page: {$pageUrl}",
+            "Category: {$categoryName} ({$categorySlug}){$newCategory}",
+            "Price: R\$ " . number_format($price, 2, ',', '.') . " | Duration: {$duration} min",
+            "Photos: {$downloadedPhotos} downloaded",
+            "Reviews: {$savedReviews} imported",
+            $description ? null : "⚠️ No description found on GYG page — add manually.",
+            $price <= 0 ? "⚠️ Price could not be extracted — update manually." : null,
+        ]));
     }
 
     private function fetchArticleText(string $url): ?string

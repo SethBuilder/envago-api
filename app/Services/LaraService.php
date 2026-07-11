@@ -406,6 +406,12 @@ When Seif asks to change something in an article:
 
 Use list_articles to see all articles.
 
+## GYG Affiliate Scraping
+When Seif pastes a GetYourGuide URL (getyourguide.com), call `scrape_gyg` immediately with that URL.
+Do not ask for confirmation first — just run it and report the result.
+After success, summarize: activity name, provider page URL, activity page URL, photos downloaded, reviews imported, and any warnings flagged.
+If a new category was created, mention it clearly so Seif can decide if the slug/name is right.
+
 ## Tone
 Concise, professional, insightful. Lead with the insight, follow with the data.
 PROMPT;
@@ -680,6 +686,17 @@ PROMPT;
                     'destination' => ['type' => 'string', 'description' => 'The destination to research, e.g. "Jericoacoara", "Fortaleza", "Arraial do Cabo"'],
                 ],
                 'required' => ['destination'],
+            ],
+        ],
+        [
+            'name'        => 'scrape_gyg',
+            'description' => 'Scrape a GetYourGuide activity page and create it as an affiliate activity on Envago. Creates an unclaimed provider from the operator name, rewrites the description with AI, downloads photos, imports reviews, and sets booking_method=affiliate with the GYG affiliate link. Call this whenever Seif pastes a GetYourGuide URL.',
+            'input_schema' => [
+                'type'       => 'object',
+                'properties' => [
+                    'url' => ['type' => 'string', 'description' => 'The full GetYourGuide activity URL to scrape'],
+                ],
+                'required' => ['url'],
             ],
         ],
     ];

@@ -9,7 +9,7 @@ class Provider extends Model
 {
     use SoftDeletes;
 
-    protected $fillable = ['user_id', 'business_name', 'slug', 'pix_key', 'bank_details', 'logo_url', 'verified_at', 'status', 'whatsapp_number'];
+    protected $fillable = ['user_id', 'business_name', 'slug', 'pix_key', 'bank_details', 'logo_url', 'verified_at', 'status', 'whatsapp_number', 'claimed'];
 
     protected static function booted(): void
     {
