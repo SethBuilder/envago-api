@@ -89,9 +89,17 @@ class ProviderController extends Controller
     public function forceDestroy(Provider $provider)
     {
         $name = $provider->business_name;
-        $provider->forceDelete();
+        $provider->user->delete(); // cascades via DB FK: user → provider → activities/reviews/etc.
 
         return redirect()->route('admin.providers')->with('success', "Operador \"{$name}\" apagado permanentemente.");
+    }
+
+    public function updateEmail(Request $request, Provider $provider)
+    {
+        $request->validate(['email' => 'required|email|unique:users,email,' . $provider->user_id]);
+        $provider->user->update(['email' => $request->email]);
+
+        return back()->with('success', "E-mail atualizado para {$request->email}.");
     }
 
     public function destroyActivity(Provider $provider, Activity $activity)

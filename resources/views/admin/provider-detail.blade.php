@@ -47,7 +47,15 @@
     <div style="padding:20px 24px; display:flex; flex-direction:column; gap:14px;">
       <div><div style="font-size:11px;color:#aaa;text-transform:uppercase;letter-spacing:.8px;margin-bottom:4px;">Nome</div><div style="font-size:15px;font-weight:500;">{{ $provider->user->name }}</div></div>
       <div><div style="font-size:11px;color:#aaa;text-transform:uppercase;letter-spacing:.8px;margin-bottom:4px;">Negócio</div><div style="font-size:15px;font-weight:500;">{{ $provider->business_name }}</div></div>
-      <div><div style="font-size:11px;color:#aaa;text-transform:uppercase;letter-spacing:.8px;margin-bottom:4px;">E-mail</div><div style="font-size:14px;color:#555;">{{ $provider->user->email }}</div></div>
+      <div>
+        <div style="font-size:11px;color:#aaa;text-transform:uppercase;letter-spacing:.8px;margin-bottom:4px;">E-mail</div>
+        <form method="POST" action="{{ route('admin.providers.update-email', $provider) }}" style="display:flex;gap:8px;align-items:center;">
+          @csrf @method('PATCH')
+          <input type="email" name="email" value="{{ $provider->user->email }}" required
+                 style="font-size:14px;color:#555;border:1px solid #e2e8f0;border-radius:6px;padding:4px 8px;flex:1;min-width:0;">
+          <button type="submit" class="btn btn-ghost" style="font-size:12px;padding:4px 12px;white-space:nowrap;">Salvar</button>
+        </form>
+      </div>
       <div><div style="font-size:11px;color:#aaa;text-transform:uppercase;letter-spacing:.8px;margin-bottom:4px;">WhatsApp</div><div style="font-size:14px;color:#555;">{{ $provider->whatsapp_number ?? '—' }}</div></div>
       <div><div style="font-size:11px;color:#aaa;text-transform:uppercase;letter-spacing:.8px;margin-bottom:4px;">Cadastro</div><div style="font-size:14px;color:#555;">{{ $provider->created_at->format('d/m/Y H:i') }}</div></div>
     </div>

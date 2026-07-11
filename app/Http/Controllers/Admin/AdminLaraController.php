@@ -1173,21 +1173,26 @@ class AdminLaraController extends Controller
             $providerId = $existingProvider->id;
             $providerNote = "Using existing provider ID {$providerId} ({$operatorName}).";
         } else {
-            $email    = 'gyg-' . $providerSlug . '@envago.live';
-            $userId   = DB::table('users')->insertGetId([
-                'name'              => $operatorName,
-                'email'             => $email,
-                'password'          => Hash::make(Str::random(32)),
-                'email_verified_at' => now(),
-                'created_at'        => now(),
-                'updated_at'        => now(),
-            ]);
+            $email        = 'gyg-' . $providerSlug . '@envago.live';
+            $existingUser = DB::table('users')->where('email', $email)->first();
+            if ($existingUser) {
+                $userId = $existingUser->id;
+            } else {
+                $userId = DB::table('users')->insertGetId([
+                    'name'              => $operatorName,
+                    'email'             => $email,
+                    'password'          => Hash::make(Str::random(32)),
+                    'email_verified_at' => now(),
+                    'created_at'        => now(),
+                    'updated_at'        => now(),
+                ]);
+            }
 
             $providerId = DB::table('providers')->insertGetId([
                 'user_id'       => $userId,
                 'business_name' => $operatorName,
                 'slug'          => $providerSlug,
-                'status'        => 'approved',
+                'status'        => 'pending',
                 'claimed'       => false,
                 'created_at'    => now(),
                 'updated_at'    => now(),

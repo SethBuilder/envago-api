@@ -49,6 +49,7 @@ Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(fun
     Route::post('/providers/{provider}/reject',           [AdminProvider::class, 'reject'])->name('providers.reject');
     Route::post('/providers/{provider}/impersonate',      [AdminProvider::class, 'impersonate'])->name('providers.impersonate');
     Route::post('/providers/{provider}/resend-activation',             [AdminProvider::class, 'resendActivation'])->name('providers.resend-activation');
+    Route::patch('/providers/{provider}/email',                          [AdminProvider::class, 'updateEmail'])->name('providers.update-email');
     Route::delete('/providers/{provider}',                              [AdminProvider::class, 'destroy'])->name('providers.destroy');
     Route::delete('/providers/{provider}/force',                        [AdminProvider::class, 'forceDestroy'])->name('providers.force-destroy')->withTrashed();
     Route::delete('/providers/{provider}/activities/{activity}',        [AdminProvider::class, 'destroyActivity'])->name('providers.activities.destroy');

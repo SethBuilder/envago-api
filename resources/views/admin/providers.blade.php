@@ -29,27 +29,27 @@
       </thead>
       <tbody>
         @foreach($providers as $provider)
-        @php $deleted = $provider->trashed(); @endphp
-        <tr style="{{ $deleted ? 'opacity:0.4;' : '' }}">
-          <td style="font-weight:500;">{{ $provider->user->name }}{{ $deleted ? ' (arquivado)' : '' }}</td>
-          <td>{{ $provider->business_name }}</td>
-          <td style="font-size:13px; color:#888;">{{ $provider->user->email }}</td>
-          <td style="font-size:13px; color:#aaa;">{{ $provider->created_at->format('d/m/Y') }}</td>
-          <td style="font-size:13px; text-align:center;">
+        @php $deleted = $provider->trashed(); $faded = $deleted ? 'color:#bbb;' : ''; @endphp
+        <tr>
+          <td style="font-weight:500; {{ $faded }}">{{ $provider->user->name }}{{ $deleted ? ' (arquivado)' : '' }}</td>
+          <td style="{{ $faded }}">{{ $provider->business_name }}</td>
+          <td style="font-size:13px; color:{{ $deleted ? '#ccc' : '#888' }};">{{ $provider->user->email }}</td>
+          <td style="font-size:13px; color:{{ $deleted ? '#ccc' : '#aaa' }};">{{ $provider->created_at->format('d/m/Y') }}</td>
+          <td style="font-size:13px; text-align:center; {{ $faded }}">
             @if($provider->lara_onboarded_at)
-              <span style="color:#22c55e;" title="{{ $provider->lara_onboarded_at->format('d/m/Y H:i') }}">✓</span>
+              <span style="color:{{ $deleted ? '#bbb' : '#22c55e' }};" title="{{ $provider->lara_onboarded_at->format('d/m/Y H:i') }}">✓</span>
             @else
               <span style="color:#ddd;">—</span>
             @endif
           </td>
-          <td style="font-size:13px; color:#aaa;">
+          <td style="font-size:13px; color:{{ $deleted ? '#ccc' : '#aaa' }};">
             @if($provider->first_login_at)
               <span title="{{ $provider->first_login_at->format('d/m/Y H:i') }}">{{ $provider->first_login_at->format('d/m/Y') }}</span>
             @else
               <span style="color:#ddd;">—</span>
             @endif
           </td>
-          <td><span class="badge badge-{{ $provider->status }}">
+          <td style="{{ $faded }}"><span class="badge badge-{{ $provider->status }}">
             {{ match($provider->status) { 'pending' => 'Pendente', 'approved' => 'Aprovado', 'rejected' => 'Rejeitado', default => $provider->status } }}
           </span></td>
           <td style="display:flex; gap:8px; flex-wrap:wrap;">
