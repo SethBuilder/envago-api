@@ -13,7 +13,7 @@ class ProviderController extends Controller
         $preview = $request->boolean('preview');
 
         $provider = Provider::with(['activities' => function ($q) {
-                $q->with(['cover', 'firstVideo', 'category', 'reviews'])
+                $q->with(['firstPhoto', 'firstVideo', 'category', 'reviews'])
                   ->where('is_active', true)
                   ->orderBy('name');
             }])
@@ -39,8 +39,8 @@ class ProviderController extends Controller
                     'pricing_type'     => $a->pricing_type,
                     'pricing_unit'     => $a->pricing_unit,
                     'unit_capacity'    => $a->unit_capacity,
-                    'cover_url'        => $a->cover?->url,
-                    'first_video'      => $a->cover ? null : ($a->firstVideo ? ['url' => $a->firstVideo->url, 'poster_url' => $a->firstVideo->poster_url] : null),
+                    'cover_url'        => $a->firstPhoto?->url,
+                    'first_video'      => $a->firstPhoto ? null : ($a->firstVideo ? ['url' => $a->firstVideo->url, 'poster_url' => $a->firstVideo->poster_url] : null),
                     'category'         => $a->category?->only(['id', 'name', 'slug']),
                     'avg_rating'       => $a->reviews->avg('rating') ? round($a->reviews->avg('rating'), 1) : null,
                     'review_count'     => $a->reviews->count(),

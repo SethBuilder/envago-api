@@ -53,6 +53,14 @@ class Activity extends Model
         return $this->hasOne(Media::class)->where('type', 'cover')->orderBy('order');
     }
 
+    public function firstPhoto()
+    {
+        return $this->hasOne(Media::class)
+            ->whereIn('type', ['cover', 'gallery'])
+            ->orderByRaw("CASE WHEN type = 'cover' THEN 0 ELSE 1 END")
+            ->orderBy('order');
+    }
+
     public function firstVideo()
     {
         return $this->hasOne(Media::class)->where('type', 'video')->orderBy('order');
