@@ -340,15 +340,15 @@
       <div class="video-grid" id="video-grid" style="margin-top:4px;"></div>
       <span class="f-error" id="err-photos"></span>
 
-      {{-- Instagram Reels import --}}
+      {{-- Media URL import --}}
       <div style="border-top:1px solid #f0f0f0;padding-top:16px;margin-top:8px;">
-        <div class="f-label" style="margin-bottom:8px;">Importar fotos e vídeos do Instagram</div>
+        <div class="f-label" style="margin-bottom:8px;">Importar fotos e vídeos</div>
         <div id="ig-url-list"></div>
         <button type="button" onclick="addIgUrl()" class="add-time-btn" style="margin-top:4px;">
           <svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
           Adicionar link
         </button>
-        <p class="f-hint" style="margin-top:6px;">Cole o link de uma foto ou vídeo do Instagram. A mídia será importada automaticamente.</p>
+        <p class="f-hint" style="margin-top:6px;">Cole um link direto de foto ou vídeo, ou um post do Instagram.</p>
       </div>
 
     </div>
@@ -464,7 +464,7 @@ function addIgUrl(val) {
   const div = document.createElement('div');
   div.id = 'ig-' + idx;
   div.style.cssText = 'display:flex;gap:8px;margin-bottom:8px;';
-  div.innerHTML = `<input type="text" class="f-input" placeholder="https://www.instagram.com/reel/..." style="flex:1;" value="${val||''}">
+  div.innerHTML = `<input type="text" class="f-input" placeholder="https://... (foto, vídeo ou Instagram)" style="flex:1;" value="${val||''}">
     <button type="button" class="time-chip-remove" onclick="document.getElementById('ig-${idx}').remove()">
       <svg width="11" height="11" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
     </button>`;
@@ -637,7 +637,7 @@ document.getElementById('edit-form').addEventListener('submit', async function(e
   selectedVideos.forEach(f => formData.append('videos[]', f));
   document.querySelectorAll('#ig-url-list input').forEach(inp => {
     const v = inp.value.trim();
-    if (v) formData.append('instagram_urls[]', v);
+    if (v) formData.append('media_urls[]', v);
   });
 
   try {

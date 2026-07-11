@@ -137,8 +137,8 @@ class ActivityController extends Controller
             'pricing_unit'      => 'nullable|string|max:30|required_if:pricing_type,per_unit',
             'photos.*'          => 'image|mimes:jpeg,png,jpg,webp|max:20480',
             'videos.*'          => 'file|mimes:mp4,mov,webm|max:102400',
-            'instagram_urls'    => 'nullable|array',
-            'instagram_urls.*'  => 'nullable|url',
+            'media_urls'        => 'nullable|array',
+            'media_urls.*'      => 'nullable|url',
             'delete_media'      => 'nullable|array',
             'delete_media.*'    => 'integer',
         ], [
@@ -168,23 +168,39 @@ class ActivityController extends Controller
         $updateData     = $request->all();
         $updateData['highlights'] = $this->decodeHighlights($request->input('highlights'));
 
-        $igUrls = array_filter((array) $request->input('instagram_urls', []));
-        if (!empty($igUrls)) {
-            $apify     = app(\App\Services\ApifyService::class);
-            $sessionId = 'provider-' . $provider->id;
-            foreach ($igUrls as $igUrl) {
-                $scraped = $apify->scrapeInstagramVideo(trim($igUrl));
-                if ($scraped) {
-                    $filename = $apify->downloadToTemp($scraped['video_url'], $sessionId, '', $scraped['audio_url'] ?? null);
-                    if ($filename) {
-                        if ($scraped['instagram_handle'] ?? null) {
-                            Storage::disk('local')->put("temp/{$sessionId}/{$filename}.handle", $scraped['instagram_handle']);
+        $mediaUrls = array_filter((array) $request->input('media_urls', []));
+        if (!empty($mediaUrls)) {
+            $apify      = app(\App\Services\ApifyService::class);
+            $sessionId  = 'provider-' . $provider->id;
+            $videoExts  = ['mp4', 'mov', 'webm', 'avi'];
+
+            foreach ($mediaUrls as $i => $url) {
+                $url = trim($url);
+
+                if (str_contains($url, 'instagram.com')) {
+                    $scraped = $apify->scrapeInstagramVideo($url);
+                    if ($scraped) {
+                        $filename = $apify->downloadToTemp($scraped['video_url'], $sessionId, '', $scraped['audio_url'] ?? null);
+                        if ($filename) {
+                            if ($scraped['instagram_handle'] ?? null) {
+                                Storage::disk('local')->put("temp/{$sessionId}/{$filename}.handle", $scraped['instagram_handle']);
+                            }
+                            $newVideos[] = [
+                                'path'             => Storage::disk('local')->path("temp/{$sessionId}/{$filename}"),
+                                'poster_url'       => $scraped['poster_url'] ?? null,
+                                'instagram_handle' => $scraped['instagram_handle'] ?? null,
+                            ];
                         }
-                        $newVideos[] = [
-                            'path'             => Storage::disk('local')->path("temp/{$sessionId}/{$filename}"),
-                            'poster_url'       => $scraped['poster_url'] ?? null,
-                            'instagram_handle' => $scraped['instagram_handle'] ?? null,
-                        ];
+                    }
+                } else {
+                    $urlExt   = strtolower(pathinfo(parse_url($url, PHP_URL_PATH), PATHINFO_EXTENSION));
+                    $tempPath = $this->downloadUrlToTemp($url, $sessionId, $i);
+                    if ($tempPath) {
+                        if (in_array($urlExt, $videoExts)) {
+                            $newVideos[] = ['path' => $tempPath, 'poster_url' => null, 'instagram_handle' => null];
+                        } else {
+                            $newPhotos[] = $tempPath;
+                        }
                     }
                 }
             }
@@ -201,6 +217,35 @@ class ActivityController extends Controller
             'redirect' => route('provider.activities'),
             'message'  => 'Passeio atualizado com sucesso.',
         ]);
+    }
+
+    private function downloadUrlToTemp(string $url, string $sessionId, int $index): ?string
+    {
+        try {
+            $response = Http::timeout(30)->get($url);
+            if (!$response->successful()) return null;
+
+            $ct  = $response->header('Content-Type') ?? '';
+            $ext = 'jpg';
+            if (str_contains($ct, 'png'))        $ext = 'png';
+            elseif (str_contains($ct, 'webp'))   $ext = 'webp';
+            elseif (str_contains($ct, 'mp4') || str_contains($ct, 'video/mp4')) $ext = 'mp4';
+            elseif (str_contains($ct, 'mov') || str_contains($ct, 'quicktime')) $ext = 'mov';
+            elseif (str_contains($ct, 'webm'))   $ext = 'webm';
+            else {
+                $urlExt = strtolower(pathinfo(parse_url($url, PHP_URL_PATH), PATHINFO_EXTENSION));
+                if (in_array($urlExt, ['png', 'webp', 'jpg', 'jpeg', 'mp4', 'mov', 'webm'])) {
+                    $ext = $urlExt === 'jpeg' ? 'jpg' : $urlExt;
+                }
+            }
+
+            $path = "temp/{$sessionId}/direct-{$index}-" . time() . ".{$ext}";
+            Storage::disk('local')->put($path, $response->body());
+            return Storage::disk('local')->path($path);
+        } catch (\Throwable $e) {
+            Log::warning('media.direct-download failed', ['url' => $url, 'err' => $e->getMessage()]);
+            return null;
+        }
     }
 
     public function aiEnhanceDescription(Request $request)
