@@ -1230,7 +1230,7 @@ class AdminLaraController extends Controller
 
         // Step 7: Store reviews
         $savedReviews = 0;
-        foreach (array_slice($reviews, 0, self::MAX_REVIEWS ?? 10) as $review) {
+        foreach (array_slice($reviews, 0, 10) as $review) {
             $body = trim($review['body'] ?? '');
             if (!$body) continue;
 
