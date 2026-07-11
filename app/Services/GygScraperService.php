@@ -195,7 +195,8 @@ async function pageFunction(context) {
 }
 JS;
 
-        $response = Http::timeout(120)->post(
+        set_time_limit(300);
+        $response = Http::timeout(240)->post(
             "https://api.apify.com/v2/acts/apify~playwright-scraper/run-sync-get-dataset-items?token={$token}",
             [
                 'startUrls'    => [['url' => $url]],
