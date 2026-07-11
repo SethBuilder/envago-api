@@ -125,13 +125,22 @@ async function pageFunction(context) {
         }
     }
 
-    // Operator name
-    const operatorName = await get([
-        '[data-testid="supplier-name"]',
-        '[class*="SupplierName"]',
-        '[class*="provider-name"]',
-        '[class*="OperatorName"]',
-    ]);
+    // Operator name — CSS selectors miss it; match text patterns instead
+    const operatorName = await page.evaluate(() => {
+        const patterns = [
+            /Activity provider[:\s]+([^\n]+)/i,
+            /Provided by[:\s]+([^\n]+)/i,
+            /Offered by[:\s]+([^\n]+)/i,
+            /Fornecido por[:\s]+([^\n]+)/i,
+            /Operador[:\s]+([^\n]+)/i,
+        ];
+        const text = document.body.innerText;
+        for (const re of patterns) {
+            const m = text.match(re);
+            if (m && m[1].trim()) return m[1].trim();
+        }
+        return null;
+    }).catch(() => null);
 
     // Category from breadcrumbs
     const categoryText = await page.$$eval(
