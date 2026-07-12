@@ -251,18 +251,50 @@
     })
     .then(function (r) { return r.json(); })
     .then(function (data) {
-      typingEl.remove();
-      appendMsg('assistant', data.reply || 'Algo deu errado.');
+      if (!data.job_id) {
+        typingEl.remove();
+        appendMsg('assistant', 'Algo deu errado.');
+        thinking = false;
+        document.getElementById('lara-send').disabled = false;
+        return;
+      }
+      pollStatus(data.job_id, typingEl);
     })
     .catch(function () {
       typingEl.remove();
       appendMsg('assistant', 'Erro de conexão. Tente novamente.');
-    })
-    .finally(function () {
       thinking = false;
       document.getElementById('lara-send').disabled = false;
     });
   };
+
+  function pollStatus(jobId, typingEl) {
+    var interval = setInterval(function () {
+      fetch('{{ route('admin.lara.status', ['jobId' => '__JOB__']) }}'.replace('__JOB__', jobId), {
+        headers: { 'X-CSRF-TOKEN': document.querySelector('meta[name=csrf-token]').content },
+      })
+      .then(function (r) { return r.json(); })
+      .then(function (data) {
+        if (data.status === 'done') {
+          clearInterval(interval);
+          typingEl.remove();
+          appendMsg('assistant', data.message || 'Pronto.');
+          thinking = false;
+          document.getElementById('lara-send').disabled = false;
+        } else if (data.status === 'failed') {
+          clearInterval(interval);
+          typingEl.remove();
+          appendMsg('assistant', 'Erro: ' + (data.error || 'Algo deu errado.'));
+          thinking = false;
+          document.getElementById('lara-send').disabled = false;
+        }
+        // pending / processing → keep polling
+      })
+      .catch(function () {
+        // network glitch — keep polling, don't stop
+      });
+    }, 3000);
+  }
 
   function appendMsg(role, text) {
     var msgs = document.getElementById('messages');

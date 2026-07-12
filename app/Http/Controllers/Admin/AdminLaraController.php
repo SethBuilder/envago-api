@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Jobs\ProcessLaraMessage;
 use App\Models\ResearchData;
 use App\Services\ApifyService;
 use App\Services\GygScraperService;
@@ -34,36 +35,43 @@ class AdminLaraController extends Controller
         return view('admin.lara-chat', compact('history'));
     }
 
-    public function message(Request $request, LaraService $lara)
+    public function message(Request $request)
     {
         $request->validate(['message' => 'required|string|max:4000']);
 
         $sessionId   = $this->sessionId();
         $userMessage = $request->input('message');
 
-        set_time_limit(400);
+        $jobId = (string) Str::uuid();
 
-        $history = DB::table('lara_conversations')
-            ->where('session_id', $sessionId)
-            ->where('created_at', '>=', now()->subDay())
-            ->orderBy('created_at')
-            ->get();
-
-        $reply = $lara->respond(
-            $history->all(),
-            $userMessage,
-            'admin',
-            null,
-            null,
-            $this->makeAdminToolExecutor()
-        );
-
-        DB::table('lara_conversations')->insert([
-            ['session_id' => $sessionId, 'uuid' => $sessionId, 'role' => 'user',      'message' => $userMessage, 'created_at' => now(), 'updated_at' => now()],
-            ['session_id' => $sessionId, 'uuid' => $sessionId, 'role' => 'assistant', 'message' => $reply,       'created_at' => now(), 'updated_at' => now()],
+        DB::table('lara_jobs')->insert([
+            'id'           => $jobId,
+            'session_id'   => $sessionId,
+            'status'       => 'pending',
+            'user_message' => $userMessage,
+            'created_at'   => now(),
+            'updated_at'   => now(),
         ]);
 
-        return response()->json(['reply' => $reply]);
+        ProcessLaraMessage::dispatch($jobId, $sessionId, $userMessage)
+            ->onQueue('lara');
+
+        return response()->json(['job_id' => $jobId]);
+    }
+
+    public function status(string $jobId)
+    {
+        $job = DB::table('lara_jobs')->where('id', $jobId)->first();
+
+        if (!$job) {
+            return response()->json(['status' => 'not_found'], 404);
+        }
+
+        return response()->json([
+            'status'  => $job->status,
+            'message' => $job->result_message,
+            'error'   => $job->error,
+        ]);
     }
 
     public function reset()
@@ -75,7 +83,7 @@ class AdminLaraController extends Controller
         return response()->json(['ok' => true]);
     }
 
-    private function makeAdminToolExecutor(): callable
+    public function makeAdminToolExecutor(): callable
     {
         return function (string $name, array $input): mixed {
             return match ($name) {
@@ -870,7 +878,13 @@ class AdminLaraController extends Controller
         // --- Apify SERP research ---
         try {
             $apifyToken = config('services.apify.token');
-            $serpQuery  = "{$destination} o que fazer passeios";
+            $language   = $input['language'] ?? 'pt-BR';
+
+            [$langCode, $countryCode, $serpQuery] = match ($language) {
+                'en'    => ['en',    'us', "{$destination} things to do tours activities"],
+                'es'    => ['es',    'es', "{$destination} qué hacer tours actividades"],
+                default => ['pt-BR', 'br', "{$destination} o que fazer passeios"],
+            };
 
             $apifyRes = Http::timeout(30)->post(
                 "https://api.apify.com/v2/acts/apify~google-search-scraper/run-sync-get-dataset-items?token={$apifyToken}",
@@ -878,8 +892,8 @@ class AdminLaraController extends Controller
                     'queries'        => $serpQuery,
                     'maxPagesPerQuery' => 1,
                     'resultsPerPage' => 10,
-                    'languageCode'   => 'pt-BR',
-                    'countryCode'    => 'br',
+                    'languageCode'   => $langCode,
+                    'countryCode'    => $countryCode,
                 ]
             );
 
@@ -1087,10 +1101,15 @@ class AdminLaraController extends Controller
 
         // 5. SERP — what ranks + PAA
         try {
-            $serpQuery = "o que fazer em {$destination}";
+            $language  = $input['language'] ?? 'pt-BR';
+            [$langCode, $countryCode, $serpQuery] = match ($language) {
+                'en'    => ['en',    'us', "things to do in {$destination} tours activities"],
+                'es'    => ['es',    'es', "qué hacer en {$destination} tours actividades"],
+                default => ['pt-BR', 'br', "o que fazer em {$destination}"],
+            };
             $apifyRes  = Http::timeout(30)->post(
                 "https://api.apify.com/v2/acts/apify~google-search-scraper/run-sync-get-dataset-items?token={$apifyToken}",
-                ['queries' => $serpQuery, 'maxPagesPerQuery' => 1, 'resultsPerPage' => 5, 'languageCode' => 'pt-BR', 'countryCode' => 'br']
+                ['queries' => $serpQuery, 'maxPagesPerQuery' => 1, 'resultsPerPage' => 5, 'languageCode' => $langCode, 'countryCode' => $countryCode]
             );
 
             if ($apifyRes->ok() || $apifyRes->status() === 201) {

@@ -60,6 +60,7 @@ Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(fun
     // Lara admin
     Route::get('/lara',                                    [AdminLaraController::class,         'show'])->name('lara.chat');
     Route::post('/lara/message',                           [AdminLaraController::class,         'message'])->name('lara.message');
+    Route::get('/lara/status/{jobId}',                     [AdminLaraController::class,         'status'])->name('lara.status');
     Route::post('/lara/reset',                             [AdminLaraController::class,         'reset'])->name('lara.reset');
     Route::get('/lara/conversations',                      [LaraConversationsController::class, 'index'])->name('lara.conversations');
     Route::get('/lara/conversations/{sessionId}',          [LaraConversationsController::class, 'show'])->name('lara.conversations.show');

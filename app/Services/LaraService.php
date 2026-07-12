@@ -673,6 +673,7 @@ PROMPT;
                 'type'       => 'object',
                 'properties' => [
                     'destination' => ['type' => 'string', 'description' => 'The destination to generate ideas for, e.g. "Jericoacoara"'],
+                    'language'    => ['type' => 'string', 'enum' => ['pt-BR', 'en', 'es'], 'description' => 'Language for SERP research. Default pt-BR. Use en or es to check English/Spanish search landscape.'],
                 ],
                 'required' => ['destination'],
             ],
@@ -684,6 +685,7 @@ PROMPT;
                 'type'       => 'object',
                 'properties' => [
                     'destination' => ['type' => 'string', 'description' => 'The destination to research, e.g. "Jericoacoara", "Fortaleza", "Arraial do Cabo"'],
+                    'language'    => ['type' => 'string', 'enum' => ['pt-BR', 'en', 'es'], 'description' => 'Language for SERP research. Default pt-BR. Use en or es to check English/Spanish search landscape.'],
                 ],
                 'required' => ['destination'],
             ],
