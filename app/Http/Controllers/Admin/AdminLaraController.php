@@ -1177,13 +1177,15 @@ class AdminLaraController extends Controller
             return $review;
         }, $this->translateReviews($reviews));
 
+        $enhancedDesc = $rawDesc ? $this->enhanceDescription($rawDesc) : null;
+
         $result      = $this->createUnclaimedListing([
             'email_prefix'     => 'gyg',
             'category_slug'    => $categoryMap['slug'],
             'category_name'    => $categoryMap['name'],
             'operator_name'    => $operatorName,
             'activity_name'    => $title,
-            'description'      => $rawDesc ?: null,
+            'description'      => $enhancedDesc,
             'price'            => 0,
             'duration_minutes' => $duration,
             'city'             => $city,
@@ -1208,7 +1210,7 @@ class AdminLaraController extends Controller
             "Category: {$result['category_name']} ({$result['category_slug']}){$newCategory}",
             "Duration: {$duration} min | Reviews: {$result['saved_reviews']} imported",
             "⚠️ Price = 0 — update manually via Ver como operador.",
-            $rawDesc ? "Description saved as-is — use AI button to rewrite to PT-BR." : "⚠️ No description found — add manually.",
+            $enhancedDesc ? "Description auto-enhanced to PT-BR." : "⚠️ No description found — add manually.",
         ]));
     }
 
@@ -1383,6 +1385,30 @@ class AdminLaraController extends Controller
             return array_map([$this, 'sanitizeUtf8'], $data);
         }
         return $data;
+    }
+
+    private function enhanceDescription(string $raw): string
+    {
+        try {
+            $res = \Illuminate\Support\Facades\Http::timeout(40)->withHeaders([
+                'x-api-key'         => env('ANTHROPIC_API_KEY'),
+                'anthropic-version' => '2023-06-01',
+                'content-type'      => 'application/json',
+            ])->post('https://api.anthropic.com/v1/messages', [
+                'model'      => 'claude-haiku-4-5-20251001',
+                'max_tokens' => 600,
+                'messages'   => [[
+                    'role'    => 'user',
+                    'content' => "Você é redator especializado em turismo no Brasil. Melhore esta descrição de passeio para o site Envago.live.\n\nRegras:\n- Se estiver em inglês, traduza para PT-BR\n- Reescreva em tom convidativo e específico para turistas brasileiros\n- Use Markdown: ## para seções, **negrito** para destaques, listas com -\n- Parágrafo de abertura sem título\n- Máx 400 palavras\n- Retorne apenas o Markdown, sem comentários\n\nDescrição original:\n{$raw}",
+                ]],
+            ]);
+
+            if ($res->ok()) {
+                return trim($res->json('content.0.text') ?? $raw);
+            }
+        } catch (\Throwable) {}
+
+        return $raw;
     }
 
     private function translateReviews(array $reviews): array

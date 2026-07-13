@@ -124,7 +124,7 @@
           <label class="f-label" style="margin:0;">Nome do passeio <span style="color:#ff2924">*</span></label>
           <button type="button" id="btn-enhance-name" onclick="aiEnhanceName()"
             style="font-size:11px;padding:4px 10px;border-radius:6px;border:1px solid #e0e0e0;background:#fafafa;color:#666;cursor:pointer;display:flex;align-items:center;gap:4px;line-height:1;">
-            ✨ Traduzir com IA
+            ✨ Melhorar com IA
           </button>
         </div>
         <input type="text" name="name" value="{{ $activity->name }}"

@@ -306,7 +306,7 @@ class ActivityController extends Controller
             'max_tokens' => 60,
             'messages'   => [[
                 'role'    => 'user',
-                'content' => "Traduza e formate este nome de passeio turístico para PT-BR. Regras: título curto e atraente, em português do Brasil, capitalização correta (cada palavra importante em maiúscula), sem aspas nem pontuação no final, retorne APENAS o nome traduzido sem mais nada.\n\nNome original: {$name}",
+                'content' => "Melhore este nome de passeio turístico para o mercado brasileiro. Regras: se estiver em inglês, traduza para PT-BR; torne-o mais atraente e específico para turistas; capitalização correta (cada palavra importante em maiúscula); sem aspas nem pontuação no final; retorne APENAS o nome melhorado sem mais nada.\n\nNome: {$name}",
             ]],
         ]);
 
