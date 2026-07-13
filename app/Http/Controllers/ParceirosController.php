@@ -5,9 +5,9 @@ namespace App\Http\Controllers;
 use App\Services\ApifyService;
 use App\Services\LaraService;
 use App\Services\OnboardingService;
+use App\Services\UrlFetcher;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use PhpOffice\PhpSpreadsheet\IOFactory;
@@ -19,7 +19,7 @@ class ParceirosController extends Controller
         return view('parceiros');
     }
 
-    public function message(Request $request, LaraService $lara, OnboardingService $onboarding)
+    public function message(Request $request, LaraService $lara, OnboardingService $onboarding, UrlFetcher $fetcher, ApifyService $apify)
     {
         $request->validate([
             'session_id' => 'required|string|max:100',
@@ -92,7 +92,6 @@ class ParceirosController extends Controller
         if (!$isInit && $userMessage) {
             preg_match_all('~https?://(?:www\.)?instagram\.com/(?:reel|p)/[A-Za-z0-9_\-]+/?~', $userMessage, $igMatches);
             if (!empty($igMatches[0])) {
-                $apify = app(ApifyService::class);
                 foreach ($igMatches[0] as $igUrl) {
                     $scraped = $apify->scrapeInstagramVideo($igUrl);
                     if ($scraped) {
@@ -118,13 +117,29 @@ class ParceirosController extends Controller
 
         $triggerMessage = $isInit ? '__init__' : (trim($userMessage . $igVideoNotes) ?: 'Olá');
 
+        $toolExecutor = function (string $name, array $input) use ($fetcher, $apify, $sessionId): mixed {
+            return match ($name) {
+                'fetch_url' => $fetcher->fetch(
+                    $input['url'] ?? '',
+                    $input,
+                    onImage: function (string $bytes, string $mime, string $filename) use ($sessionId, $input): void {
+                        $tripSlug  = $input['photo_for_trip'] ?? null;
+                        $savedName = $tripSlug ? "{$tripSlug}__{$filename}" : $filename;
+                        $this->saveTempPhotoContent($sessionId, $savedName, $bytes);
+                    }
+                ),
+                'fetch_rendered_page' => $apify->crawlWebsite($input['url'] ?? ''),
+                default               => 'Unknown tool.',
+            };
+        };
+
         $rawReply = $lara->respond(
             $history->all(),
             $triggerMessage,
             'parceiros',
             null,
             empty($fileBlocks) ? null : $fileBlocks,
-            $this->makeFetchUrlExecutor($sessionId)
+            $toolExecutor
         );
 
         // Intercept confirmed/onboard JSON
@@ -265,54 +280,6 @@ class ParceirosController extends Controller
                 Log::error('parceiros: misuse email failed', ['error' => $e->getMessage()]);
             }
         }
-    }
-
-    private function makeFetchUrlExecutor(string $sessionId): callable
-    {
-        return function (string $name, array $input) use ($sessionId): mixed {
-            if ($name !== 'fetch_url') return 'Unknown tool.';
-
-            $url = $input['url'] ?? '';
-            if (!filter_var($url, FILTER_VALIDATE_URL)) {
-                return 'Invalid URL.';
-            }
-
-            try {
-                $response = Http::timeout(10)->get($url);
-                if (!$response->successful()) {
-                    return "Could not fetch URL (HTTP {$response->status()}).";
-                }
-
-                $contentType = strtolower($response->header('Content-Type') ?? '');
-                $mime        = explode(';', $contentType)[0];
-                $body        = $response->body();
-
-                if (str_starts_with($mime, 'image/')) {
-                    $filename   = basename(parse_url($url, PHP_URL_PATH)) ?: uniqid('img_') . '.jpg';
-                    $tripSlug   = $input['photo_for_trip'] ?? null;
-                    $savedName  = $tripSlug ? "{$tripSlug}__{$filename}" : $filename;
-                    $this->saveTempPhotoContent($sessionId, $savedName, $body);
-                    return [
-                        ['type' => 'image', 'source' => ['type' => 'base64', 'media_type' => $mime ?: 'image/jpeg', 'data' => base64_encode($body)]],
-                    ];
-                }
-
-                if (str_contains($mime, 'pdf')) {
-                    return [
-                        ['type' => 'text',     'text' => "PDF fetched from {$url}"],
-                        ['type' => 'document', 'source' => ['type' => 'base64', 'media_type' => 'application/pdf', 'data' => base64_encode($body)]],
-                    ];
-                }
-
-                // HTML or plain text — strip tags, truncate
-                $text = strip_tags($body);
-                $text = preg_replace('/\s+/', ' ', trim($text));
-                return substr($text, 0, 4000);
-            } catch (\Throwable $e) {
-                Log::warning('parceiros: fetch_url failed', ['url' => $url, 'error' => $e->getMessage()]);
-                return "Could not fetch URL: {$e->getMessage()}";
-            }
-        };
     }
 
     private function listTempFiles(string $sessionId): array

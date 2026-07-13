@@ -147,13 +147,25 @@ PROMPT;
     private array $parceirosTools = [
         [
             'name'         => 'fetch_url',
-            'description'  => 'Fetch content from a URL. ALWAYS call this when you encounter any URL in the operator\'s data — do not reference URLs by name or invent filenames. Retrieve the actual content so it can be used on the operator\'s page. When fetching an image for a specific trip, pass the trip slug in photo_for_trip so the system stores it against the correct trip.',
+            'description'  => 'Fetch content from a URL. ALWAYS call this when you encounter any URL in the operator\'s data — do not reference URLs by name or invent filenames. Retrieve the actual content so it can be used on the operator\'s page. When fetching an image for a specific trip, pass the trip slug in photo_for_trip so the system stores it against the correct trip. If the returned content looks thin or empty (JS-rendered site), call fetch_rendered_page instead.',
             'input_schema' => [
                 'type'       => 'object',
                 'properties' => [
                     'url'            => ['type' => 'string', 'description' => 'The URL to fetch'],
                     'reason'         => ['type' => 'string', 'description' => 'Why you are fetching this URL'],
                     'photo_for_trip' => ['type' => 'string', 'description' => 'Slug of the trip this image belongs to (e.g. "buggy-por-do-sol"). Only set when fetching a trip photo.'],
+                ],
+                'required'   => ['url'],
+            ],
+        ],
+        [
+            'name'         => 'fetch_rendered_page',
+            'description'  => 'Fetch a JavaScript-rendered web page using a headless browser. Use this when fetch_url returns thin or empty content (e.g. Canva, React/Vue sites, Instagram profiles). Returns rendered text content plus image references. Claude can then call fetch_url on specific image URLs.',
+            'input_schema' => [
+                'type'       => 'object',
+                'properties' => [
+                    'url'    => ['type' => 'string', 'description' => 'The URL to render and fetch'],
+                    'reason' => ['type' => 'string', 'description' => 'Why you are using rendered fetch instead of fetch_url'],
                 ],
                 'required'   => ['url'],
             ],
@@ -411,6 +423,13 @@ When Seif pastes a GetYourGuide URL (getyourguide.com), call `scrape_gyg` immedi
 Do not ask for confirmation first — just run it and report the result.
 After success, summarize: activity name, provider page URL, activity page URL, photos downloaded, reviews imported, and any warnings flagged.
 If a new category was created, mention it clearly so Seif can decide if the slug/name is right.
+
+## Creating Listings from Other Pages
+After reading any non-GYG operator or tour page with fetch_url/fetch_rendered_page, if Seif asks to create a listing, call `create_unclaimed_listing` with the data you extracted. Never use `scrape_gyg` for non-GYG URLs.
+
+## Fetching URLs
+When Seif shares any URL (website, Canva page, Instagram, operator site, etc.), ALWAYS call fetch_url immediately — do not say you cannot access it. If fetch_url returns thin or empty content (JS-rendered site), call fetch_rendered_page instead. You can then call fetch_url on specific image URLs from the page to inspect images. Never tell Seif you lack the ability to fetch a URL.
+Exception: GetYourGuide URLs (getyourguide.com) always use scrape_gyg, never fetch_url.
 
 ## Tone
 Concise, professional, insightful. Lead with the insight, follow with the data.
@@ -701,6 +720,52 @@ PROMPT;
                 'required' => ['url'],
             ],
         ],
+        [
+            'name'         => 'create_unclaimed_listing',
+            'description'  => 'Create an unclaimed operator page and activity from data you have already extracted (e.g. by reading an operator website). Use after fetch_url/fetch_rendered_page when Seif asks to create a listing from any non-GYG page.',
+            'input_schema' => [
+                'type'       => 'object',
+                'properties' => [
+                    'operator_name'    => ['type' => 'string',  'description' => 'Operator or business name'],
+                    'category_slug'    => ['type' => 'string',  'description' => 'Category slug (e.g. buggy, surfe, barco, kitesurf)'],
+                    'category_name'    => ['type' => 'string',  'description' => 'Category display name in PT-BR'],
+                    'activity_name'    => ['type' => 'string',  'description' => 'Activity or tour name'],
+                    'description'      => ['type' => 'string',  'description' => 'Activity description in PT-BR'],
+                    'price'            => ['type' => 'number',  'description' => 'Price in BRL (use 0 if unknown)'],
+                    'duration_minutes' => ['type' => 'integer', 'description' => 'Duration in minutes'],
+                    'city'             => ['type' => 'string',  'description' => 'City name'],
+                    'state'            => ['type' => 'string',  'description' => 'State abbreviation (e.g. CE, RN, BA)'],
+                    'booking_method'   => ['type' => 'string',  'description' => 'affiliate if linking to external booking, direct if they will book on Envago', 'enum' => ['affiliate', 'direct']],
+                    'link_url'         => ['type' => 'string',  'description' => 'External booking or source URL (required for affiliate method)'],
+                    'reviews'          => ['type' => 'array',   'description' => 'Optional reviews to import', 'items' => ['type' => 'object', 'properties' => ['author' => ['type' => 'string'], 'rating' => ['type' => 'number'], 'body' => ['type' => 'string']], 'required' => ['body']]],
+                ],
+                'required' => ['operator_name', 'category_slug', 'category_name', 'activity_name'],
+            ],
+        ],
+        [
+            'name'         => 'fetch_url',
+            'description'  => 'Fetch content from a URL. Returns text for HTML pages (with image URLs listed), a vision block for images, or a document block for PDFs. If the page content looks thin or empty (JS-rendered site), call fetch_rendered_page instead.',
+            'input_schema' => [
+                'type'       => 'object',
+                'properties' => [
+                    'url'    => ['type' => 'string', 'description' => 'The URL to fetch'],
+                    'reason' => ['type' => 'string', 'description' => 'Why you are fetching this URL'],
+                ],
+                'required'   => ['url'],
+            ],
+        ],
+        [
+            'name'         => 'fetch_rendered_page',
+            'description'  => 'Fetch a JavaScript-rendered web page using a headless browser. Use this when fetch_url returns thin or empty content (e.g. Canva, React/Vue sites). Returns rendered markdown content with image references. Call fetch_url on specific image URLs you want to inspect.',
+            'input_schema' => [
+                'type'       => 'object',
+                'properties' => [
+                    'url'    => ['type' => 'string', 'description' => 'The URL to render and fetch'],
+                    'reason' => ['type' => 'string', 'description' => 'Why you are using rendered fetch instead of fetch_url'],
+                ],
+                'required'   => ['url'],
+            ],
+        ],
     ];
 
     private function loadActiveInstructions(string $context): string
@@ -784,7 +849,7 @@ PROMPT;
             $tools = $this->parceirosTools;
         }
 
-        $useTools    = in_array($context, ['parceiros', 'admin']) && $toolExecutor !== null;
+        $useTools    = in_array($context, ['parceiros', 'admin', 'provider']) && $toolExecutor !== null;
         $httpTimeout = $context === 'admin' ? 240 : 90;
 
         // Tool use loop — runs up to 10 iterations to handle chained tool calls

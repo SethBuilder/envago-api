@@ -108,7 +108,10 @@ class AdminLaraController extends Controller
                 'research_destination'  => $this->toolResearchDestination($input),
                 'query_leads'           => $this->toolQueryLeads($input),
                 'suggest_articles'      => $this->toolSuggestArticles($input),
-                'scrape_gyg'            => $this->toolScrapeGyg($input),
+                'scrape_gyg'               => $this->toolScrapeGyg($input),
+                'create_unclaimed_listing' => $this->toolCreateUnclaimedListing($input),
+                'fetch_url'                => app(\App\Services\UrlFetcher::class)->fetch($input['url'] ?? '', $input),
+                'fetch_rendered_page'   => app(\App\Services\ApifyService::class)->crawlWebsite($input['url'] ?? ''),
                 default                 => "Unknown tool: {$name}",
             };
         };
@@ -1142,7 +1145,6 @@ class AdminLaraController extends Controller
 
         $gyg = app(GygScraperService::class);
 
-        // Step 1: Scrape
         try {
             $data = $gyg->scrape($url);
         } catch (\Throwable $e) {
@@ -1150,54 +1152,126 @@ class AdminLaraController extends Controller
             return "Scrape failed: {$e->getMessage()}";
         }
 
-        $title        = $data['title']         ?? null;
-        $rawDesc      = $data['description']   ?? '';
-        $photos       = $data['photos']        ?? [];
-        $rawPrice     = $data['price']         ?? 0;
+        $title        = $data['title']           ?? null;
+        $rawDesc      = $data['description']     ?? '';
         $rawDuration  = $data['durationMinutes'] ?? null;
-        $operatorName = $data['operatorName']  ?? null;
-        $breadcrumbs  = $data['categoryText']  ?? [];
-        $location     = $data['location']      ?? null;
-        $reviews      = $data['reviews']       ?? [];
+        $operatorName = $data['operatorName']    ?? null;
+        $breadcrumbs  = $data['categoryText']    ?? [];
+        $location     = $data['location']        ?? null;
+        $reviews      = $data['reviews']         ?? [];
 
         if (!$title) return 'Error: could not extract activity title from the GYG page. The page may have changed structure.';
 
-        // Step 2: Category mapping
         $categoryMap  = $gyg->mapCategory($breadcrumbs, $title);
-        $categorySlug = $categoryMap['slug'];
-        $categoryName = $categoryMap['name'];
+        $city         = $location ? explode(',', $location)[0] : 'Jericoacoara';
+        $affiliateUrl = $gyg->buildAffiliateUrl($url);
+        $duration     = $gyg->parseDuration($rawDuration);
+        $operatorName = $operatorName ?: "Operador GYG — {$title}";
 
-        $category = DB::table('categories')->where('slug', $categorySlug)->first();
+        $gygGenericNames = ['gyg traveler', 'getyourguide traveler', 'anonymous', 'traveler', 'traveller'];
+        $reviews = array_map(function ($review) use ($gygGenericNames) {
+            $raw             = $review['author'] ?? '';
+            $review['author'] = (empty($raw) || in_array(strtolower($raw), $gygGenericNames))
+                ? 'Viajante'
+                : $raw;
+            return $review;
+        }, $this->translateReviews($reviews));
+
+        $result      = $this->createUnclaimedListing([
+            'email_prefix'     => 'gyg',
+            'category_slug'    => $categoryMap['slug'],
+            'category_name'    => $categoryMap['name'],
+            'operator_name'    => $operatorName,
+            'activity_name'    => $title,
+            'description'      => $rawDesc ?: null,
+            'price'            => 0,
+            'duration_minutes' => $duration,
+            'city'             => $city,
+            'state'            => 'CE',
+            'booking_method'   => 'affiliate',
+            'link_url'         => $affiliateUrl,
+            'source_url'       => $url,
+            'reviews'          => $reviews,
+        ]);
+
+        $pageUrl     = "https://envago.live/operadores/{$result['provider_slug']}";
+        $activityUrl = "https://envago.live/passeio/{$result['activity_slug']}";
+        $newCategory = $result['is_new_category']
+            ? " ⚠️ New category created: {$result['category_name']} ({$result['category_slug']})"
+            : '';
+
+        return implode("\n", array_filter([
+            "✅ GYG activity scraped and created.",
+            "Activity: \"{$title}\" → {$activityUrl}",
+            "Provider: {$result['provider_note']}",
+            "Operator page: {$pageUrl}",
+            "Category: {$result['category_name']} ({$result['category_slug']}){$newCategory}",
+            "Duration: {$duration} min | Reviews: {$result['saved_reviews']} imported",
+            "⚠️ Price = 0 — update manually via Ver como operador.",
+            $rawDesc ? "Description saved as-is — use AI button to rewrite to PT-BR." : "⚠️ No description found — add manually.",
+        ]));
+    }
+
+    private function toolCreateUnclaimedListing(array $input): string
+    {
+        foreach (['operator_name', 'category_slug', 'category_name', 'activity_name'] as $field) {
+            if (empty($input[$field])) return "Error: {$field} is required.";
+        }
+
+        $result      = $this->createUnclaimedListing($input);
+        $pageUrl     = "https://envago.live/operadores/{$result['provider_slug']}";
+        $activityUrl = "https://envago.live/passeio/{$result['activity_slug']}";
+        $newCategory = $result['is_new_category']
+            ? " ⚠️ New category: {$result['category_name']} ({$result['category_slug']})"
+            : '';
+
+        return implode("\n", array_filter([
+            "✅ Unclaimed listing created.",
+            "Activity: \"{$input['activity_name']}\" → {$activityUrl}",
+            "Provider: {$result['provider_note']}",
+            "Operator page: {$pageUrl}",
+            "Category: {$result['category_name']} ({$result['category_slug']}){$newCategory}",
+            $result['saved_reviews'] ? "Reviews: {$result['saved_reviews']} imported" : null,
+            !($input['price'] ?? 0) ? "⚠️ Price = 0 — update manually." : null,
+            empty($input['description']) ? "⚠️ No description — add manually." : null,
+        ]));
+    }
+
+    private function createUnclaimedListing(array $spec): array
+    {
+        $emailPrefix  = $spec['email_prefix']  ?? 'unclaimed';
+        $categorySlug = $spec['category_slug'];
+        $categoryName = $spec['category_name'];
+        $operatorName = $spec['operator_name'];
+        $activityName = $spec['activity_name'];
+
+        // Category upsert
+        $isNewCategory = false;
+        $category      = DB::table('categories')->where('slug', $categorySlug)->first();
         if (!$category) {
-            $categoryId = DB::table('categories')->insertGetId([
+            $categoryId    = DB::table('categories')->insertGetId([
                 'slug'       => $categorySlug,
                 'name'       => $categoryName,
                 'created_at' => now(),
                 'updated_at' => now(),
             ]);
-            $category = (object) ['id' => $categoryId, 'slug' => $categorySlug, 'name' => $categoryName];
+            $category      = (object) ['id' => $categoryId, 'slug' => $categorySlug, 'name' => $categoryName];
+            $isNewCategory = true;
         }
 
-        // Step 3: Parse city/state from location
-        $city  = $location ? explode(',', $location)[0] : 'Jericoacoara';
-        $state = 'CE';
-
-        // Step 4: Create user + unclaimed provider
-        $operatorName = $operatorName ?: "Operador GYG — {$title}";
-        $providerSlug = Str::slug($operatorName);
-
+        // User + unclaimed provider
+        $providerSlug     = Str::slug($operatorName);
         $existingProvider = DB::table('providers')->where('slug', $providerSlug)->first();
 
         if ($existingProvider) {
-            $providerId = $existingProvider->id;
+            $providerId   = $existingProvider->id;
             $providerNote = "Using existing provider ID {$providerId} ({$operatorName}).";
         } else {
-            $email        = 'gyg-' . $providerSlug . '@envago.live';
+            $email        = $emailPrefix . '-' . $providerSlug . '@envago.live';
             $existingUser = DB::table('users')->where('email', $email)->first();
-            if ($existingUser) {
-                $userId = $existingUser->id;
-            } else {
-                $userId = DB::table('users')->insertGetId([
+            $userId       = $existingUser
+                ? $existingUser->id
+                : DB::table('users')->insertGetId([
                     'name'              => $operatorName,
                     'email'             => $email,
                     'password'          => Hash::make(Str::random(32)),
@@ -1205,7 +1279,6 @@ class AdminLaraController extends Controller
                     'created_at'        => now(),
                     'updated_at'        => now(),
                 ]);
-            }
 
             $providerId = DB::table('providers')->insertGetId([
                 'user_id'       => $userId,
@@ -1220,60 +1293,46 @@ class AdminLaraController extends Controller
             $providerNote = "Created new unclaimed provider ID {$providerId} ({$operatorName}).";
         }
 
-        // Step 5: Build affiliate URL
-        $affiliateUrl = $gyg->buildAffiliateUrl($url);
-
-        // Step 6: Create activity
-        $activitySlug = Str::slug($title);
-        $existing     = DB::table('activities')->where('slug', $activitySlug)->first();
-        if ($existing) {
+        // Activity
+        $activitySlug = Str::slug($activityName);
+        if (DB::table('activities')->where('slug', $activitySlug)->exists()) {
             $activitySlug .= '-' . Str::random(4);
         }
-
-        $duration = $gyg->parseDuration($rawDuration);
 
         $activityId = DB::table('activities')->insertGetId([
             'provider_id'      => $providerId,
             'category_id'      => $category->id,
-            'name'             => $title,
+            'name'             => $activityName,
             'slug'             => $activitySlug,
-            'description'      => $rawDesc ?: null,
+            'description'      => $spec['description']      ?? null,
             'highlights'       => null,
-            'price'            => 0,
-            'pricing_type'     => 'per_person',
-            'duration_minutes' => $duration,
+            'price'            => $spec['price']            ?? 0,
+            'pricing_type'     => $spec['pricing_type']     ?? 'per_person',
+            'duration_minutes' => $spec['duration_minutes'] ?? null,
             'capacity'         => 20,
-            'city'             => $city,
-            'state'            => $state,
+            'city'             => $spec['city']             ?? 'Jericoacoara',
+            'state'            => $spec['state']            ?? 'CE',
             'is_active'        => true,
-            'booking_method'   => 'affiliate',
-            'link_url'         => $affiliateUrl,
+            'booking_method'   => $spec['booking_method']   ?? 'affiliate',
+            'link_url'         => $spec['link_url']         ?? null,
             'created_at'       => now(),
             'updated_at'       => now(),
         ]);
 
-        // Step 7: Store reviews
-        $reviews = $this->translateReviews($reviews);
-        $gygGenericNames = ['gyg traveler', 'getyourguide traveler', 'anonymous', 'traveler', 'traveller'];
+        // Reviews
+        $sourceUrl    = $spec['source_url'] ?? null;
         $savedReviews = 0;
-        foreach (array_slice($reviews, 0, 10) as $review) {
+        foreach (array_slice($spec['reviews'] ?? [], 0, 10) as $review) {
             $body = trim($review['body'] ?? '');
             if (!$body) continue;
 
-            $authorRaw = $review['author'] ?? '';
-            $author = (empty($authorRaw) || in_array(strtolower($authorRaw), $gygGenericNames))
-                ? 'Viajante'
-                : $authorRaw;
-
-            $rating = max(1, min(5, (int) round((float) ($review['rating'] ?? 5))));
-
             DB::table('reviews')->insert([
                 'activity_id'  => $activityId,
-                'author_name'  => $author,
-                'rating'       => $rating,
+                'author_name'  => $review['author'] ?? 'Viajante',
+                'rating'       => max(1, min(5, (int) round((float) ($review['rating'] ?? 5)))),
                 'body'         => $body,
                 'source'       => 'scraped',
-                'source_url'   => $url,
+                'source_url'   => $review['source_url'] ?? $sourceUrl,
                 'is_approved'  => true,
                 'scraped_at'   => now(),
                 'created_at'   => now(),
@@ -1282,20 +1341,18 @@ class AdminLaraController extends Controller
             $savedReviews++;
         }
 
-        $pageUrl      = "https://envago.live/operadores/{$providerSlug}";
-        $activityUrl  = "https://envago.live/passeio/{$activitySlug}";
-        $newCategory  = $categoryMap['is_new'] ? " ⚠️ New category created: {$categoryName} ({$categorySlug})" : '';
-
-        return implode("\n", array_filter([
-            "✅ GYG activity scraped and created.",
-            "Activity: \"{$title}\" → {$activityUrl}",
-            "Provider: {$providerNote}",
-            "Operator page: {$pageUrl}",
-            "Category: {$categoryName} ({$categorySlug}){$newCategory}",
-            "Duration: {$duration} min | Reviews: {$savedReviews} imported",
-            "⚠️ Price = 0 — update manually via Ver como operador.",
-            $rawDesc ? "Description saved as-is — use AI button to rewrite to PT-BR." : "⚠️ No description found — add manually.",
-        ]));
+        return [
+            'provider_id'     => $providerId,
+            'provider_slug'   => $providerSlug,
+            'activity_id'     => $activityId,
+            'activity_slug'   => $activitySlug,
+            'category_id'     => $category->id,
+            'category_name'   => $categoryName,
+            'category_slug'   => $categorySlug,
+            'is_new_category' => $isNewCategory,
+            'provider_note'   => $providerNote,
+            'saved_reviews'   => $savedReviews,
+        ];
     }
 
     private function fetchArticleText(string $url): ?string

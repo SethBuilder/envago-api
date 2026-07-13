@@ -147,6 +147,46 @@ class ApifyService
      * Download audio from $audioUrl and merge it into $videoPath in-place using FFmpeg.
      * Falls back to the original video-only file if anything fails.
      */
+    /**
+     * Crawl a JS-rendered page using Apify's Website Content Crawler.
+     * Returns markdown/text content with image references Claude can call fetch_url on.
+     */
+    public function crawlWebsite(string $url): string
+    {
+        $token = config('services.apify.token');
+        if (!$token) return 'Apify not configured.';
+
+        try {
+            $response = Http::timeout(120)->post(
+                "https://api.apify.com/v2/acts/apify~website-content-crawler/run-sync-get-dataset-items?token={$token}",
+                [
+                    'startUrls'     => [['url' => $url]],
+                    'maxCrawlPages' => 1,
+                    'maxCrawlDepth' => 0,
+                    'crawlerType'   => 'playwright:firefox',
+                ]
+            );
+
+            if (!$response->successful()) {
+                Log::warning('apify: crawlWebsite failed', ['url' => $url, 'status' => $response->status()]);
+                return "Could not render page (HTTP {$response->status()}).";
+            }
+
+            $items = $response->json();
+            if (empty($items)) return 'Page rendered but no content found.';
+
+            $item     = $items[0];
+            $content  = $item['markdown'] ?? $item['text'] ?? strip_tags($item['content'] ?? '');
+            $content  = preg_replace('/\s+/', ' ', trim($content));
+
+            return substr($content, 0, 5000);
+
+        } catch (\Throwable $e) {
+            Log::error('apify: crawlWebsite exception', ['url' => $url, 'error' => $e->getMessage()]);
+            return "Could not render page: {$e->getMessage()}";
+        }
+    }
+
     private function mergeAudioInPlace(string $videoPath, string $audioUrl): void
     {
         $audioPath  = dirname($videoPath) . '/audio_' . Str::random(8) . '.aac';

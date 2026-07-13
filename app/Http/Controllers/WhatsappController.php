@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Services\ApifyService;
 use App\Services\LaraService;
+use App\Services\UrlFetcher;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
@@ -27,7 +28,7 @@ class WhatsappController extends Controller
         return response('Forbidden', 403);
     }
 
-    public function webhook(Request $request, LaraService $lara): JsonResponse
+    public function webhook(Request $request, LaraService $lara, UrlFetcher $fetcher): JsonResponse
     {
         $message = $request->input('entry.0.changes.0.value.messages.0');
 
@@ -43,9 +44,14 @@ class WhatsappController extends Controller
             return response()->json(['status' => 'ok']);
         }
 
+        $fileBlocks = [];
         if (in_array($type, ['image', 'document'])) {
-            $caption = trim($message[$type]['caption'] ?? '');
-            $body    = $caption ?: '[operador enviou uma ' . ($type === 'image' ? 'foto' : 'arquivo') . ']';
+            $caption  = trim($message[$type]['caption'] ?? '');
+            $body     = $caption ?: '[operador enviou uma ' . ($type === 'image' ? 'foto' : 'arquivo') . ']';
+            $mediaId  = $message[$type]['id'] ?? null;
+            if ($mediaId) {
+                $fileBlocks = $this->downloadMetaMedia($mediaId, $fetcher);
+            }
         } elseif ($type === 'interactive') {
             $body = $message['interactive']['button_reply']['title'] ?? '';
         } else {
@@ -116,12 +122,19 @@ class WhatsappController extends Controller
 
         $messageToLara = trim($body . $igVideoNotes) ?: $body;
 
+        $toolExecutor = fn(string $name, array $input) => match ($name) {
+            'fetch_url' => $fetcher->fetch($input['url'] ?? '', $input),
+            default     => 'Unknown tool.',
+        };
+
         try {
             $reply = $lara->respond(
                 $history->all(),
                 $messageToLara,
                 $context,
-                $providerInfo
+                $providerInfo,
+                empty($fileBlocks) ? null : $fileBlocks,
+                $toolExecutor
             );
         } catch (\Throwable $e) {
             Log::error('whatsapp.lara_error', ['phone' => $from, 'error' => $e->getMessage()]);
@@ -149,6 +162,31 @@ class WhatsappController extends Controller
         self::sendMessage($from, $displayReply);
 
         return response()->json(['status' => 'ok']);
+    }
+
+    private function downloadMetaMedia(string $mediaId, UrlFetcher $fetcher): array
+    {
+        $token = config('services.whatsapp.token');
+        if (!$token) return [];
+
+        try {
+            $meta = Http::withToken($token)
+                ->get("https://graph.facebook.com/v20.0/{$mediaId}");
+
+            if (!$meta->successful()) return [];
+
+            $mediaUrl = $meta->json('url');
+            $mime     = $meta->json('mime_type') ?? 'image/jpeg';
+
+            if (!$mediaUrl) return [];
+
+            $bytes = Http::withToken($token)->timeout(15)->get($mediaUrl)->body();
+
+            return [$fetcher->buildImageBlock($bytes, $mime)];
+        } catch (\Throwable $e) {
+            Log::warning('whatsapp: media download failed', ['media_id' => $mediaId, 'error' => $e->getMessage()]);
+            return [];
+        }
     }
 
     public static function sendMessage(string $to, string $body): void
