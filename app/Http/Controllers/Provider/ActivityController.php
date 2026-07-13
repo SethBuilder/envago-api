@@ -96,7 +96,7 @@ class ActivityController extends Controller
         abort_if($activity->provider_id !== $provider->id, 403);
 
         $categories = Category::orderBy('name')->get();
-        $activity->load('media');
+        $activity->load('media', 'questions');
 
         $scheduleGroups = $activity->schedules()
             ->where('date', '>=', Carbon::today())

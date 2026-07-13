@@ -69,4 +69,9 @@ class Activity extends Model
     {
         return $this->hasMany(Review::class)->where('is_approved', true);
     }
+
+    public function questions()
+    {
+        return $this->hasMany(ActivityQuestion::class)->orderBy('sort_order');
+    }
 }

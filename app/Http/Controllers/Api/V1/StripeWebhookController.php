@@ -103,6 +103,14 @@ class StripeWebhookController extends Controller
 
             // ── Operator notification email ───────────────────────────────
             if ($operator) {
+                $answersHtml = '';
+                if (!empty($booking->customer_answers)) {
+                    $answersHtml = '<br><h3 style="margin-bottom:8px;">Informações do cliente</h3>';
+                    foreach ($booking->customer_answers as $a) {
+                        $answersHtml .= "<p><strong>" . htmlspecialchars($a['label']) . ":</strong> " . htmlspecialchars($a['answer']) . "</p>";
+                    }
+                }
+
                 try {
                     $resend->emails->send([
                         'from'    => $from,
@@ -118,6 +126,7 @@ class StripeWebhookController extends Controller
                             <p><strong>Total:</strong> {$total}</p>
                             <p><strong>Código:</strong> {$ref}</p>
                             " . ($waLink ? "<p><strong>WhatsApp do turista:</strong> <a href=\"{$waLink}\">{$guestWa}</a></p>" : "") . "
+                            {$answersHtml}
                         ",
                     ]);
                 } catch (\Throwable) {}
@@ -134,6 +143,14 @@ class StripeWebhookController extends Controller
                     $digits = '55' . $digits;
                 }
 
+                $answersWa = '';
+                if (!empty($booking->customer_answers)) {
+                    $answersWa = "\n\n📋 *Informações do cliente*";
+                    foreach ($booking->customer_answers as $a) {
+                        $answersWa .= "\n• {$a['label']}: {$a['answer']}";
+                    }
+                }
+
                 $message = "🎉 *Nova reserva confirmada!*\n\n"
                     . "📌 *{$activity->name}*\n"
                     . "👤 {$name}\n"
@@ -141,7 +158,8 @@ class StripeWebhookController extends Controller
                     . "👥 {$unitsLabel}\n"
                     . "💰 {$total}\n"
                     . "🔖 {$ref}"
-                    . ($waLink ? "\n📱 wa.me/{$waDigits}" : '');
+                    . ($waLink ? "\n📱 wa.me/{$waDigits}" : '')
+                    . $answersWa;
 
                 \App\Http\Controllers\WhatsappController::sendMessage($digits, $message);
             } catch (\Throwable) {}

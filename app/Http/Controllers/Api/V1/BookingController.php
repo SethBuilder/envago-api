@@ -23,6 +23,10 @@ class BookingController extends Controller
             'guest_email'     => ['required', 'email', 'max:180'],
             'guest_cpf'       => ['nullable', 'string', 'min:11', 'max:14'],
             'guest_whatsapp'  => ['nullable', 'string', 'max:20'],
+            'customer_answers' => ['nullable', 'array'],
+            'customer_answers.*.question_id' => ['required', 'integer'],
+            'customer_answers.*.label'       => ['required', 'string', 'max:255'],
+            'customer_answers.*.answer'      => ['required', 'string', 'max:500'],
         ]);
 
         try {
@@ -56,6 +60,7 @@ class BookingController extends Controller
                     'guest_email' => $data['guest_email'],
                     'guest_cpf'       => isset($data['guest_cpf']) ? preg_replace('/\D/', '', $data['guest_cpf']) : null,
                     'guest_whatsapp'  => isset($data['guest_whatsapp']) ? preg_replace('/\D/', '', $data['guest_whatsapp']) : null,
+                    'customer_answers' => $data['customer_answers'] ?? null,
                     'reference'   => 'ENV-' . strtoupper(Str::random(6)),
                     'status'      => 'pending',
                     'expires_at'  => now()->addMinutes(15),

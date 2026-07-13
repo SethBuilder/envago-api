@@ -362,6 +362,73 @@
     </div>
   </div>
 
+  {{-- Step 4: Custom Questions --}}
+  <div class="step-card" id="questions-card">
+    <div class="step-head">
+      <div class="step-num">4</div>
+      <div><div class="step-title">Perguntas para o cliente</div><div class="step-desc">Informações que você precisa coletar na hora da reserva (ex: pousada para embarque)</div></div>
+    </div>
+    <div class="step-divider"></div>
+    <div class="step-body">
+
+      {{-- Existing questions list --}}
+      <div id="questions-list">
+        @forelse($activity->questions as $q)
+        <div class="question-row" id="qrow-{{ $q->id }}" style="display:flex;align-items:center;justify-content:space-between;padding:10px 12px;border:1px solid #e8e8e8;border-radius:8px;gap:10px;">
+          <div style="flex:1;min-width:0;">
+            <span style="font-size:13px;font-weight:500;color:#111;">{{ $q->label }}</span>
+            <span style="font-size:11px;color:#aaa;margin-left:8px;">{{ $q->type === 'select' ? 'seleção' : 'texto livre' }}{{ $q->required ? ' · obrigatório' : '' }}</span>
+            @if($q->type === 'select' && $q->options)
+            <div style="font-size:11px;color:#999;margin-top:2px;">{{ implode(', ', $q->options) }}</div>
+            @endif
+          </div>
+          <button type="button" onclick="deleteQuestion({{ $q->id }})"
+            style="flex-shrink:0;width:28px;height:28px;border-radius:6px;border:1px solid #e8e8e8;background:#fff;cursor:pointer;display:flex;align-items:center;justify-content:center;color:#bbb;transition:all .15s;"
+            onmouseover="this.style.borderColor='#ff2924';this.style.color='#ff2924';"
+            onmouseout="this.style.borderColor='#e8e8e8';this.style.color='#bbb';">
+            <svg width="11" height="11" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+          </button>
+        </div>
+        @empty
+        <p id="questions-empty" style="font-size:13px;color:#aaa;margin:0;">Nenhuma pergunta adicionada ainda.</p>
+        @endforelse
+      </div>
+
+      {{-- Add question form --}}
+      <div style="border-top:1px solid #f0f0f0;padding-top:16px;margin-top:4px;">
+        <div class="f-label" style="margin-bottom:10px;">Adicionar pergunta</div>
+        <div style="display:flex;flex-direction:column;gap:10px;">
+          <input type="text" id="q-label" class="f-input" placeholder="Ex: Em qual pousada você está hospedado?" maxlength="255">
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+            <div>
+              <label class="f-label" style="margin-bottom:5px;">Tipo</label>
+              <select id="q-type" class="f-input" onchange="onQTypeChange(this.value)">
+                <option value="text">Texto livre</option>
+                <option value="select">Seleção (lista)</option>
+              </select>
+            </div>
+            <div style="display:flex;align-items:flex-end;">
+              <label style="display:flex;align-items:center;gap:6px;font-size:13px;color:#555;cursor:pointer;padding-bottom:9px;">
+                <input type="checkbox" id="q-required" checked style="width:14px;height:14px;accent-color:#111;"> Obrigatório
+              </label>
+            </div>
+          </div>
+          <div id="q-options-wrap" style="display:none;">
+            <label class="f-label" style="margin-bottom:5px;">Opções <span style="font-weight:400;color:#aaa;">(uma por linha)</span></label>
+            <textarea id="q-options" class="f-input" rows="4" placeholder="Pousada do Sol&#10;Pousada Mar Azul&#10;Hotel Central&#10;Outro"></textarea>
+          </div>
+          <button type="button" onclick="addQuestion()"
+            style="align-self:flex-start;display:inline-flex;align-items:center;gap:6px;padding:9px 18px;border-radius:8px;border:none;background:#111;color:#fff;font-size:13px;font-weight:600;cursor:pointer;transition:opacity .15s;"
+            onmouseover="this.style.opacity='.8'" onmouseout="this.style.opacity='1'" id="btn-add-question">
+            <svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+            Adicionar
+          </button>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
   <div class="form-actions">
     <a href="{{ route('provider.activities') }}" class="btn-back">Cancelar</a>
     <button type="submit" class="btn-submit" id="submit-btn">Salvar alterações</button>
@@ -721,6 +788,94 @@ function showGeneralError(msg) {
 }
 </script>
 <style>@keyframes spin{to{transform:rotate(360deg)}}</style>
+
+<script>
+// ── Custom questions ──────────────────────────────────────────
+const CSRF = document.querySelector('[name=_token]').value;
+const STORE_URL  = '{{ route('provider.activities.questions.store', $activity) }}';
+const DESTROY_URL = (id) => `{{ route('provider.activities.questions.destroy', [$activity, '__ID__']) }}`.replace('__ID__', id);
+
+function onQTypeChange(val) {
+  document.getElementById('q-options-wrap').style.display = val === 'select' ? 'block' : 'none';
+}
+
+async function addQuestion() {
+  const label    = document.getElementById('q-label').value.trim();
+  const type     = document.getElementById('q-type').value;
+  const required = document.getElementById('q-required').checked;
+  const options  = document.getElementById('q-options').value.trim();
+
+  if (!label) { alert('Escreva a pergunta antes de adicionar.'); return; }
+  if (type === 'select' && !options) { alert('Adicione pelo menos uma opção.'); return; }
+
+  const btn = document.getElementById('btn-add-question');
+  btn.disabled = true; btn.textContent = 'Adicionando...';
+
+  try {
+    const res = await fetch(STORE_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': CSRF, 'Accept': 'application/json' },
+      body: JSON.stringify({ label, type, required, options }),
+    });
+    const data = await res.json();
+    if (!res.ok) { alert(data.message || 'Erro ao adicionar.'); return; }
+
+    // Render new question row
+    const empty = document.getElementById('questions-empty');
+    if (empty) empty.remove();
+
+    const list = document.getElementById('questions-list');
+    const div = document.createElement('div');
+    div.className = 'question-row';
+    div.id = 'qrow-' + data.id;
+    div.style.cssText = 'display:flex;align-items:center;justify-content:space-between;padding:10px 12px;border:1px solid #e8e8e8;border-radius:8px;gap:10px;';
+    const typeLabel  = data.type === 'select' ? 'seleção' : 'texto livre';
+    const reqLabel   = data.required ? ' · obrigatório' : '';
+    const optsLabel  = data.type === 'select' && data.options?.length ? `<div style="font-size:11px;color:#999;margin-top:2px;">${data.options.join(', ')}</div>` : '';
+    div.innerHTML = `
+      <div style="flex:1;min-width:0;">
+        <span style="font-size:13px;font-weight:500;color:#111;">${data.label}</span>
+        <span style="font-size:11px;color:#aaa;margin-left:8px;">${typeLabel}${reqLabel}</span>
+        ${optsLabel}
+      </div>
+      <button type="button" onclick="deleteQuestion(${data.id})"
+        style="flex-shrink:0;width:28px;height:28px;border-radius:6px;border:1px solid #e8e8e8;background:#fff;cursor:pointer;display:flex;align-items:center;justify-content:center;color:#bbb;transition:all .15s;"
+        onmouseover="this.style.borderColor='#ff2924';this.style.color='#ff2924';"
+        onmouseout="this.style.borderColor='#e8e8e8';this.style.color='#bbb';">
+        <svg width="11" height="11" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>`;
+    list.appendChild(div);
+
+    // Reset form
+    document.getElementById('q-label').value = '';
+    document.getElementById('q-type').value = 'text';
+    document.getElementById('q-required').checked = true;
+    document.getElementById('q-options').value = '';
+    document.getElementById('q-options-wrap').style.display = 'none';
+  } catch { alert('Erro de conexão.'); }
+  finally { btn.disabled = false; btn.textContent = ''; btn.innerHTML = '<svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg> Adicionar'; }
+}
+
+async function deleteQuestion(id) {
+  if (!confirm('Remover esta pergunta?')) return;
+  try {
+    const res = await fetch(DESTROY_URL(id), {
+      method: 'DELETE',
+      headers: { 'X-CSRF-TOKEN': CSRF, 'Accept': 'application/json' },
+    });
+    if (res.ok) {
+      document.getElementById('qrow-' + id)?.remove();
+      if (!document.querySelector('#questions-list .question-row')) {
+        const p = document.createElement('p');
+        p.id = 'questions-empty';
+        p.style.cssText = 'font-size:13px;color:#aaa;margin:0;';
+        p.textContent = 'Nenhuma pergunta adicionada ainda.';
+        document.getElementById('questions-list').appendChild(p);
+      }
+    }
+  } catch { alert('Erro de conexão.'); }
+}
+</script>
 
 <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.2/Sortable.min.js"></script>
 <script>

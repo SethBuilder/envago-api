@@ -58,7 +58,7 @@ class ActivityController extends Controller
 
     public function show(string $slug)
     {
-        $activity = Activity::with(['category', 'media', 'provider', 'reviews'])
+        $activity = Activity::with(['category', 'media', 'provider', 'reviews', 'questions'])
             ->where('slug', $slug)
             ->where('is_active', true)
             ->firstOrFail();
@@ -128,6 +128,13 @@ class ActivityController extends Controller
                     'created_at'        => $r->created_at->toDateString(),
                 ]),
                 'schedules'        => $schedules,
+                'questions'        => $activity->questions->map(fn($q) => [
+                    'id'       => $q->id,
+                    'label'    => $q->label,
+                    'type'     => $q->type,
+                    'options'  => $q->options ?? [],
+                    'required' => $q->required,
+                ]),
             ],
         ]);
     }

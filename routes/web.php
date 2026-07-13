@@ -15,6 +15,7 @@ use App\Http\Controllers\Admin\AdminWebStoryController;
 use App\Http\Controllers\Provider\DashboardController as ProviderDashboard;
 use App\Http\Controllers\Provider\SettingsController as ProviderSettings;
 use App\Http\Controllers\Provider\ActivityController as ProviderActivity;
+use App\Http\Controllers\Provider\ActivityQuestionController;
 
 Route::get('/', function () {
     if (auth()->check()) {
@@ -105,6 +106,8 @@ Route::middleware(['auth', 'provider'])->prefix('provider')->name('provider.')->
     Route::post('/ai/enhance-description',       [ProviderActivity::class,  'aiEnhanceDescription'])->name('activities.ai.enhance');
     Route::post('/ai/extract-highlights',        [ProviderActivity::class,  'aiExtractHighlights'])->name('activities.ai.highlights');
     Route::post('/bookings/cancel',              [ProviderDashboard::class, 'cancelBookings'])->name('bookings.cancel');
+    Route::post('/passeios/{activity}/questions',              [ActivityQuestionController::class, 'store'])->name('activities.questions.store');
+    Route::delete('/passeios/{activity}/questions/{question}', [ActivityQuestionController::class, 'destroy'])->name('activities.questions.destroy');
     Route::get('/pagamentos',                    [ProviderDashboard::class, 'payouts'])->name('payouts');
     Route::get('/pagamentos/{payout}/comprovante', [ProviderDashboard::class, 'downloadPayout'])->name('payouts.download');
     Route::get('/settings',        [ProviderSettings::class, 'show'])->name('settings');
