@@ -735,7 +735,7 @@ PROMPT;
                     'duration_minutes' => ['type' => 'integer', 'description' => 'Duration in minutes'],
                     'city'             => ['type' => 'string',  'description' => 'City name'],
                     'state'            => ['type' => 'string',  'description' => 'State abbreviation (e.g. CE, RN, BA)'],
-                    'booking_method'   => ['type' => 'string',  'description' => 'affiliate if linking to external booking, direct if they will book on Envago', 'enum' => ['affiliate', 'direct']],
+                    'booking_method'   => ['type' => 'string',  'description' => 'envago = books on Envago, affiliate = external booking link, lead = contact operator directly (e.g. WhatsApp)', 'enum' => ['envago', 'affiliate', 'lead']],
                     'link_url'         => ['type' => 'string',  'description' => 'External booking or source URL (required for affiliate method)'],
                     'reviews'          => ['type' => 'array',   'description' => 'Optional reviews to import', 'items' => ['type' => 'object', 'properties' => ['author' => ['type' => 'string'], 'rating' => ['type' => 'number'], 'body' => ['type' => 'string']], 'required' => ['body']]],
                 ],
