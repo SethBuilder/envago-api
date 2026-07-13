@@ -1162,6 +1162,7 @@ class AdminLaraController extends Controller
 
         if (!$title) return 'Error: could not extract activity title from the GYG page. The page may have changed structure.';
 
+        $title        = $this->translateTitle($title);
         $categoryMap  = $gyg->mapCategory($breadcrumbs, $title);
         $city         = $location ? explode(',', $location)[0] : 'Jericoacoara';
         $affiliateUrl = $gyg->buildAffiliateUrl($url);
@@ -1385,6 +1386,30 @@ class AdminLaraController extends Controller
             return array_map([$this, 'sanitizeUtf8'], $data);
         }
         return $data;
+    }
+
+    private function translateTitle(string $title): string
+    {
+        try {
+            $res = \Illuminate\Support\Facades\Http::timeout(20)->withHeaders([
+                'x-api-key'         => env('ANTHROPIC_API_KEY'),
+                'anthropic-version' => '2023-06-01',
+                'content-type'      => 'application/json',
+            ])->post('https://api.anthropic.com/v1/messages', [
+                'model'      => 'claude-haiku-4-5-20251001',
+                'max_tokens' => 40,
+                'messages'   => [[
+                    'role'    => 'user',
+                    'content' => "Se este nome de passeio estiver em inglês, traduza para PT-BR. Se já estiver em português, retorne como está. Capitalização correta, sem aspas, retorne APENAS o nome.\n\nNome: {$title}",
+                ]],
+            ]);
+
+            if ($res->ok()) {
+                return trim($res->json('content.0.text') ?? $title);
+            }
+        } catch (\Throwable) {}
+
+        return $title;
     }
 
     private function enhanceDescription(string $raw): string
