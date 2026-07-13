@@ -5,16 +5,14 @@ namespace App\Http\Controllers\Api\V1;
 use App\Http\Controllers\Controller;
 use App\Models\Booking;
 use App\Models\Schedule;
+use App\Services\StripeService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Str;
-use Stripe\Stripe;
-use Stripe\PaymentIntent;
 
 class BookingController extends Controller
 {
-    public function store(Request $request)
+    public function store(Request $request, StripeService $stripe)
     {
         $data = $request->validate([
             'schedule_id' => ['required', 'integer', 'exists:schedules,id'],
@@ -72,8 +70,6 @@ class BookingController extends Controller
             });
 
             // ── Create Stripe PaymentIntent (card + PIX) ─────────────────
-            Stripe::setApiKey(config('services.stripe.secret'));
-
             $activity = $booking->schedule->activity;
 
             $paymentMethods = ['card'];
@@ -81,15 +77,12 @@ class BookingController extends Controller
                 $paymentMethods[] = 'pix';
             }
 
-            $pi = PaymentIntent::create([
-                'amount'               => (int) ($booking->total_price * 100),
-                'currency'             => 'brl',
-                'payment_method_types' => $paymentMethods,
-                'metadata'             => [
-                    'booking_reference' => $booking->reference,
-                    'booking_id'        => $booking->id,
-                ],
-            ]);
+            $pi = $stripe->createPaymentIntent(
+                (int) ($booking->total_price * 100),
+                'brl',
+                $paymentMethods,
+                ['booking_reference' => $booking->reference, 'booking_id' => $booking->id],
+            );
 
             $booking->update(['payment_ref' => $pi->id]);
 

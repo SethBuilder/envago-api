@@ -5,7 +5,26 @@ on:
     branches: [master]
 
 jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.4'
+          extensions: mbstring, xml, bcmath, intl, gd, fileinfo, pdo_sqlite
+
+      - name: Install dependencies
+        run: composer install --optimize-autoloader --no-interaction --no-progress
+
+      - name: Run tests
+        run: php artisan test --testsuite=Feature
+
   deploy:
+    needs: test
     runs-on: ubuntu-latest
 
     steps:

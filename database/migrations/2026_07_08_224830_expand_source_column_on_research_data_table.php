@@ -1,17 +1,22 @@
 <?php
 
 use Illuminate\Database\Migrations\Migration;
-use Illuminate\Support\Facades\DB;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
 {
     public function up(): void
     {
-        DB::statement("ALTER TABLE research_data MODIFY source VARCHAR(50) NOT NULL DEFAULT 'youtube'");
+        Schema::table('research_data', function (Blueprint $table) {
+            $table->string('source', 50)->default('youtube')->change();
+        });
     }
 
     public function down(): void
     {
-        DB::statement("ALTER TABLE research_data MODIFY source ENUM('youtube','apify_serp','apify_instagram') NOT NULL DEFAULT 'youtube'");
+        Schema::table('research_data', function (Blueprint $table) {
+            $table->string('source', 50)->default('youtube')->change();
+        });
     }
 };
