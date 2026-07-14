@@ -21,7 +21,9 @@ class ActivityController extends Controller
             $query->where('city', 'like', '%' . $request->city . '%');
         }
 
-        $activities = $query->orderBy('created_at', 'desc')->paginate(12);
+        $activities = $query->orderByRaw("CASE booking_method WHEN 'envago' THEN 1 WHEN 'lead' THEN 2 ELSE 3 END")
+                           ->orderBy('created_at', 'desc')
+                           ->paginate(12);
 
         return response()->json([
             'data' => $activities->map(fn($a) => [
