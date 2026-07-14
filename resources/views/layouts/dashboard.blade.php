@@ -232,6 +232,10 @@
         <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
         Pagamentos
       </a>
+      <a href="{{ route('admin.clicks') }}" class="nav-item {{ request()->routeIs('admin.clicks*') ? 'active' : '' }}">
+        <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/><polyline points="10 17 15 12 10 7"/><line x1="15" y1="12" x2="3" y2="12"/></svg>
+        Leads & Cliques
+      </a>
       <div style="padding:8px 12px 2px;font-size:10px;color:#ccc;letter-spacing:1px;text-transform:uppercase;font-weight:600;">Lara</div>
       <a href="{{ route('admin.lara.chat') }}" class="nav-item {{ request()->routeIs('admin.lara.chat') ? 'active' : '' }}">
         <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>

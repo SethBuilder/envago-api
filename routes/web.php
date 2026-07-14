@@ -9,6 +9,7 @@ use App\Http\Controllers\Admin\LaraConversationsController;
 use App\Http\Controllers\Admin\LaraInstructionsController;
 use App\Http\Controllers\Admin\PayoutController as AdminPayout;
 use App\Http\Controllers\Admin\ProviderController as AdminProvider;
+use App\Http\Controllers\Admin\ClicksController as AdminClicks;
 use App\Http\Controllers\Admin\ScopeLeadsController;
 use App\Http\Controllers\Admin\AdminArticleController;
 use App\Http\Controllers\Admin\AdminWebStoryController;
@@ -65,6 +66,7 @@ Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(fun
     Route::post('/lara/reset',                             [AdminLaraController::class,         'reset'])->name('lara.reset');
     Route::get('/lara/conversations',                      [LaraConversationsController::class, 'index'])->name('lara.conversations');
     Route::get('/lara/conversations/{sessionId}',          [LaraConversationsController::class, 'show'])->name('lara.conversations.show');
+    Route::get('/clicks',                                  [AdminClicks::class,                 'index'])->name('clicks');
     Route::get('/scope-leads',                             [ScopeLeadsController::class,        'index'])->name('scope-leads');
     Route::get('/articles',                                [AdminArticleController::class,      'index'])->name('articles');
     Route::get('/articles/{article}/edit',                 [AdminArticleController::class,      'edit'])->name('articles.edit');
