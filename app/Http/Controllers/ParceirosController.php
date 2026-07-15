@@ -48,6 +48,7 @@ class ParceirosController extends Controller
 
         $sessionId   = $request->input('session_id');
         $userMessage = $request->input('message', '');
+        $isInit      = $userMessage === '__init__';
 
         // Seed claim session on __init__ if claim_slug provided
         if ($isInit && $request->filled('claim_slug')) {
@@ -67,7 +68,6 @@ class ParceirosController extends Controller
         // --- Claim mode: bypass all onboarding logic ---
         $claimSession = session("claim_{$sessionId}", []);
         if (!empty($claimSession['claim_provider_id'])) {
-            $isInit = $userMessage === '__init__';
             $result = $claim->handle($isInit ? '' : $userMessage, $claimSession);
             session(["claim_{$sessionId}" => $result['session']]);
 
@@ -85,7 +85,6 @@ class ParceirosController extends Controller
             return response()->json(['reply' => $result['reply'], 'published' => false]);
         }
         // --- End claim mode ---
-        $isInit      = $userMessage === '__init__';
 
         $history = DB::table('lara_conversations')
             ->where('session_id', $sessionId)
