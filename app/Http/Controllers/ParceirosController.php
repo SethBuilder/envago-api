@@ -21,7 +21,7 @@ class ParceirosController extends Controller
         $claimSlug = $request->query('claim');
 
         if ($claimSlug) {
-            $provider = Provider::with('user')->where('slug', $claimSlug)->where('claimed', false)->first();
+            $provider = Provider::with('user')->where('slug', $claimSlug)->where(fn($q) => $q->where('claimed', false)->orWhereNull('claimed'))->first();
             if ($provider && $provider->user) {
                 return view('parceiros', ['claimProvider' => $provider, 'claimMode' => true]);
             }
@@ -53,7 +53,7 @@ class ParceirosController extends Controller
         if ($isInit && $request->filled('claim_slug')) {
             $claimProvider = Provider::with('user')
                 ->where('slug', $request->input('claim_slug'))
-                ->where('claimed', false)
+                ->where(fn($q) => $q->where('claimed', false)->orWhereNull('claimed'))
                 ->first();
             if ($claimProvider && $claimProvider->user) {
                 session(["claim_{$sessionId}" => [
