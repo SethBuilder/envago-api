@@ -319,7 +319,7 @@
             <div class="lara-dot"></div>
             <div>
                 <div class="header-lara-name">Lara</div>
-                <div class="header-lara-sub">Assistente de cadastro</div>
+                <div class="header-lara-sub">{{ ($claimMode ?? false) ? 'Reivindicar página' : 'Assistente de cadastro' }}</div>
             </div>
         </div>
     </header>
@@ -573,6 +573,8 @@ function handleKey(e) {
 }
 
 // ── Init: Lara opens the conversation ─────────────────────
+const CLAIM_SLUG = @json(($claimMode ?? false) && isset($claimProvider) ? $claimProvider->slug : null);
+
 window.addEventListener('load', async () => {
     sendBtn.disabled = true;
     showTyping();
@@ -580,6 +582,7 @@ window.addEventListener('load', async () => {
         const formData = new FormData();
         formData.append('session_id', sessionUuid);
         formData.append('message', '__init__');
+        if (CLAIM_SLUG) formData.append('claim_slug', CLAIM_SLUG);
         const res = await fetch('/parceiros/message', {
             method: 'POST',
             headers: { 'X-CSRF-TOKEN': csrf },

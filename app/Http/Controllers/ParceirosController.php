@@ -3,9 +3,11 @@
 namespace App\Http\Controllers;
 
 use App\Services\ApifyService;
+use App\Services\LaraClaimService;
 use App\Services\LaraService;
 use App\Services\OnboardingService;
 use App\Services\UrlFetcher;
+use App\Models\Provider;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -14,12 +16,21 @@ use PhpOffice\PhpSpreadsheet\IOFactory;
 
 class ParceirosController extends Controller
 {
-    public function show()
+    public function show(Request $request)
     {
-        return view('parceiros');
+        $claimSlug = $request->query('claim');
+
+        if ($claimSlug) {
+            $provider = Provider::with('user')->where('slug', $claimSlug)->where('claimed', false)->first();
+            if ($provider && $provider->user) {
+                return view('parceiros', ['claimProvider' => $provider, 'claimMode' => true]);
+            }
+        }
+
+        return view('parceiros', ['claimMode' => false]);
     }
 
-    public function message(Request $request, LaraService $lara, OnboardingService $onboarding, UrlFetcher $fetcher, ApifyService $apify)
+    public function message(Request $request, LaraService $lara, OnboardingService $onboarding, UrlFetcher $fetcher, ApifyService $apify, LaraClaimService $claim)
     {
         $request->validate([
             'session_id' => 'required|string|max:100',
@@ -37,6 +48,43 @@ class ParceirosController extends Controller
 
         $sessionId   = $request->input('session_id');
         $userMessage = $request->input('message', '');
+
+        // Seed claim session on __init__ if claim_slug provided
+        if ($isInit && $request->filled('claim_slug')) {
+            $claimProvider = Provider::with('user')
+                ->where('slug', $request->input('claim_slug'))
+                ->where('claimed', false)
+                ->first();
+            if ($claimProvider && $claimProvider->user) {
+                session(["claim_{$sessionId}" => [
+                    'claim_provider_id'    => $claimProvider->id,
+                    'claim_step'           => 'intro',
+                    'claim_email_mismatches' => 0,
+                ]]);
+            }
+        }
+
+        // --- Claim mode: bypass all onboarding logic ---
+        $claimSession = session("claim_{$sessionId}", []);
+        if (!empty($claimSession['claim_provider_id'])) {
+            $isInit = $userMessage === '__init__';
+            $result = $claim->handle($isInit ? '' : $userMessage, $claimSession);
+            session(["claim_{$sessionId}" => $result['session']]);
+
+            if (!$isInit) {
+                DB::table('lara_conversations')->insert([
+                    ['session_id' => $sessionId, 'uuid' => $sessionId, 'role' => 'user',      'message' => $userMessage,      'created_at' => now(), 'updated_at' => now()],
+                    ['session_id' => $sessionId, 'uuid' => $sessionId, 'role' => 'assistant', 'message' => $result['reply'],  'created_at' => now(), 'updated_at' => now()],
+                ]);
+            } else {
+                DB::table('lara_conversations')->insert([
+                    ['session_id' => $sessionId, 'uuid' => $sessionId, 'role' => 'assistant', 'message' => $result['reply'], 'created_at' => now(), 'updated_at' => now()],
+                ]);
+            }
+
+            return response()->json(['reply' => $result['reply'], 'published' => false]);
+        }
+        // --- End claim mode ---
         $isInit      = $userMessage === '__init__';
 
         $history = DB::table('lara_conversations')
