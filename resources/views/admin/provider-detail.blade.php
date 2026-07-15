@@ -51,10 +51,11 @@
         <div style="font-size:11px;color:#aaa;text-transform:uppercase;letter-spacing:.8px;margin-bottom:4px;">E-mail</div>
         <form id="form-email" method="POST" action="{{ route('admin.providers.update-email', $provider) }}" style="display:flex;gap:8px;align-items:center;">
           @csrf @method('PATCH')
-          <input type="email" name="email" value="{{ $provider->user->email }}" required readonly
+          <input type="email" name="email" value="{{ old('email', $provider->user->email) }}" required readonly
                  style="font-size:14px;color:#555;border:1px solid transparent;border-radius:6px;padding:4px 8px;flex:1;min-width:0;background:#f7f7f7;">
           <button type="button" onclick="toggleField(this,'form-email')" class="btn btn-ghost" style="font-size:12px;padding:4px 12px;white-space:nowrap;">Editar</button>
         </form>
+        @error('email')<div style="font-size:12px;color:#e53e3e;margin-top:4px;">{{ $message }}</div>@enderror
       </div>
       <div>
         <div style="font-size:11px;color:#aaa;text-transform:uppercase;letter-spacing:.8px;margin-bottom:4px;">WhatsApp</div>
@@ -134,10 +135,11 @@
   @endif
 </div>
 
+@push('scripts')
 <script>
 function toggleField(btn, formId) {
     const form = document.getElementById(formId);
-    const input = form.querySelector('input');
+    const input = form.querySelector('input:not([type="hidden"])');
     if (input.readOnly) {
         input.readOnly = false;
         input.style.background = '#fff';
@@ -149,6 +151,7 @@ function toggleField(btn, formId) {
     }
 }
 </script>
+@endpush
 
 @if(session('success'))
 <div style="position:fixed; bottom:24px; right:24px; background:#111; color:#fff; padding:14px 20px; border-radius:10px; font-size:14px; box-shadow:0 4px 16px rgba(0,0,0,.2);">
