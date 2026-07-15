@@ -102,6 +102,14 @@ class ProviderController extends Controller
         return back()->with('success', "E-mail atualizado para {$request->email}.");
     }
 
+    public function updateWhatsapp(Request $request, Provider $provider)
+    {
+        $request->validate(['whatsapp_number' => 'nullable|string|max:20']);
+        $provider->update(['whatsapp_number' => $request->whatsapp_number]);
+
+        return back()->with('success', "WhatsApp atualizado.");
+    }
+
     public function destroyActivity(Provider $provider, Activity $activity)
     {
         $name = $activity->name;

@@ -49,14 +49,23 @@
       <div><div style="font-size:11px;color:#aaa;text-transform:uppercase;letter-spacing:.8px;margin-bottom:4px;">Negócio</div><div style="font-size:15px;font-weight:500;">{{ $provider->business_name }}</div></div>
       <div>
         <div style="font-size:11px;color:#aaa;text-transform:uppercase;letter-spacing:.8px;margin-bottom:4px;">E-mail</div>
-        <form method="POST" action="{{ route('admin.providers.update-email', $provider) }}" style="display:flex;gap:8px;align-items:center;">
+        <form id="form-email" method="POST" action="{{ route('admin.providers.update-email', $provider) }}" style="display:flex;gap:8px;align-items:center;">
           @csrf @method('PATCH')
-          <input type="email" name="email" value="{{ $provider->user->email }}" required
-                 style="font-size:14px;color:#555;border:1px solid #e2e8f0;border-radius:6px;padding:4px 8px;flex:1;min-width:0;">
-          <button type="submit" class="btn btn-ghost" style="font-size:12px;padding:4px 12px;white-space:nowrap;">Salvar</button>
+          <input type="email" name="email" value="{{ $provider->user->email }}" required readonly
+                 style="font-size:14px;color:#555;border:1px solid transparent;border-radius:6px;padding:4px 8px;flex:1;min-width:0;background:#f7f7f7;">
+          <button type="button" onclick="toggleField(this,'form-email')" class="btn btn-ghost" style="font-size:12px;padding:4px 12px;white-space:nowrap;">Editar</button>
         </form>
       </div>
-      <div><div style="font-size:11px;color:#aaa;text-transform:uppercase;letter-spacing:.8px;margin-bottom:4px;">WhatsApp</div><div style="font-size:14px;color:#555;">{{ $provider->whatsapp_number ?? '—' }}</div></div>
+      <div>
+        <div style="font-size:11px;color:#aaa;text-transform:uppercase;letter-spacing:.8px;margin-bottom:4px;">WhatsApp</div>
+        <form id="form-whatsapp" method="POST" action="{{ route('admin.providers.update-whatsapp', $provider) }}" style="display:flex;gap:8px;align-items:center;">
+          @csrf @method('PATCH')
+          <input type="tel" name="whatsapp_number" value="{{ $provider->whatsapp_number }}" readonly
+                 placeholder="5585999999999"
+                 style="font-size:14px;color:#555;border:1px solid transparent;border-radius:6px;padding:4px 8px;flex:1;min-width:0;background:#f7f7f7;">
+          <button type="button" onclick="toggleField(this,'form-whatsapp')" class="btn btn-ghost" style="font-size:12px;padding:4px 12px;white-space:nowrap;">Editar</button>
+        </form>
+      </div>
       <div><div style="font-size:11px;color:#aaa;text-transform:uppercase;letter-spacing:.8px;margin-bottom:4px;">Cadastro</div><div style="font-size:14px;color:#555;">{{ $provider->created_at->format('d/m/Y H:i') }}</div></div>
     </div>
   </div>
@@ -124,6 +133,22 @@
     </table>
   @endif
 </div>
+
+<script>
+function toggleField(btn, formId) {
+    const form = document.getElementById(formId);
+    const input = form.querySelector('input');
+    if (input.readOnly) {
+        input.readOnly = false;
+        input.style.background = '#fff';
+        input.style.borderColor = '#e2e8f0';
+        input.focus();
+        btn.textContent = 'Salvar';
+    } else {
+        form.submit();
+    }
+}
+</script>
 
 @if(session('success'))
 <div style="position:fixed; bottom:24px; right:24px; background:#111; color:#fff; padding:14px 20px; border-radius:10px; font-size:14px; box-shadow:0 4px 16px rgba(0,0,0,.2);">

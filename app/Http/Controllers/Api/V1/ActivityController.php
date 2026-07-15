@@ -105,6 +105,7 @@ class ActivityController extends Controller
                     'slug'            => $activity->provider->slug,
                     'logo_url'        => $activity->provider->logo_url,
                     'booking_enabled' => $activity->provider->status === 'approved',
+                    'claimed'         => (bool) $activity->provider->claimed,
                 ] : null,
                 'cover_url'        => $activity->media->whereIn('type', ['cover', 'gallery'])->first()?->url,
                 'gallery'          => $activity->media->whereIn('type', ['cover', 'gallery'])->skip(1)->map(fn($m) => $m->url)->values(),
