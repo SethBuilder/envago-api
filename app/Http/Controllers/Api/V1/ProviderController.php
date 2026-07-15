@@ -28,6 +28,7 @@ class ProviderController extends Controller
                 'logo_url'        => $provider->logo_url,
                 'is_approved'     => $provider->status === 'approved',
                 'booking_enabled' => $provider->status === 'approved',
+                'claimed'         => (bool) $provider->claimed,
                 'activities'      => $provider->activities->map(fn($a) => [
                     'id'               => $a->id,
                     'name'             => $a->name,
