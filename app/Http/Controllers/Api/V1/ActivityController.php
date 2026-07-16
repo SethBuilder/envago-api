@@ -43,6 +43,7 @@ class ActivityController extends Controller
                 'provider'         => $a->provider ? ['id' => $a->provider->id, 'business_name' => $a->provider->business_name, 'slug' => $a->provider->slug, 'logo_url' => $a->provider->logo_url] : null,
                 'booking_method'   => $a->booking_method ?? 'envago',
                 'link_url'         => $a->link_url,
+                'updated_at'       => $a->updated_at->toDateString(),
                 'avg_rating'       => $a->reviews->avg('rating') ? round($a->reviews->avg('rating'), 1) : null,
                 'review_count'     => $a->reviews->count(),
                 'recent_reviews'   => $a->reviews->take(4)->map(fn($r) => [
